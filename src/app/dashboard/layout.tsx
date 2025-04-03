@@ -34,7 +34,7 @@ export default function DashboardLayout({
                 <h1 className="text-xl font-bold">대시보드</h1>
                 
                 {/* 오른쪽 영역: 검색, 알림 등 */}
-                <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
                   {/* 검색 */}
                   <div className="relative hidden sm:block">
                     <input

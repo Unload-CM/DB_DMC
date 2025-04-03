@@ -5,13 +5,13 @@ import SupabaseAuthProvider from '@/components/supabase-auth-provider';
 import I18nProvider from '@/components/I18nProvider';
 
 const geistSans = Geist({
-  variable: "--font-geist-sans",
   subsets: ["latin"],
+  variable: "--font-geist-sans",
 });
 
 const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
   subsets: ["latin"],
+  variable: "--font-geist-mono",
 });
 
 export const metadata: Metadata = {
@@ -21,12 +21,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="ko">
-      <body
+      <body 
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <I18nProvider>

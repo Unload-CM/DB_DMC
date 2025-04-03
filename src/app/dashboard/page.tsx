@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '@/lib/supabase';
 import { InventoryItem, PurchaseRequest, ProductionPlan, ShippingPlan } from '@/types';
 import { 
@@ -16,6 +17,7 @@ import { Bar } from 'react-chartjs-2';
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement);
 
 export default function Dashboard() {
+  const { t } = useTranslation('common');
   const [isLoading, setIsLoading] = useState(true);
   const [greetingMessage, setGreetingMessage] = useState('');
   const [inventorySummary, setInventorySummary] = useState({ count: 0, lowStock: 0 });
@@ -344,13 +346,13 @@ export default function Dashboard() {
         <div className="flex flex-col md:flex-row md:items-center justify-between">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-blue-900 dark:text-blue-300">{greetingMessage}, 관리자님</h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">DMC ERP 시스템 대시보드입니다.</p>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">{t('dashboard.description')}</p>
           </div>
           <div className="mt-4 md:mt-0 flex items-center">
             <div className="relative">
               <input 
                 type="text" 
-                placeholder="검색어를 입력하세요" 
+                placeholder={t('dashboard.search.placeholder')} 
                 className="pl-10 pr-4 py-2 rounded-full border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full md:w-64 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               />
               <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
@@ -372,42 +374,42 @@ export default function Dashboard() {
       {/* 빠른 접근 버튼 */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
         <QuickAccessButton 
-          title="자재관리"
+          title={t('dashboard.quickAccess.inventory')}
           icon={<FaBox className="text-blue-500" size={24} />}
           href="/dashboard/inventory"
           bgColor="bg-blue-50 dark:bg-blue-900/20"
           textColor="text-blue-700 dark:text-blue-300"
         />
         <QuickAccessButton 
-          title="구매관리"
+          title={t('dashboard.quickAccess.purchase')}
           icon={<FaShoppingCart className="text-green-500" size={24} />}
           href="/dashboard/purchase"
           bgColor="bg-green-50 dark:bg-green-900/20"
           textColor="text-green-700 dark:text-green-300"
         />
         <QuickAccessButton 
-          title="생산관리"
+          title={t('dashboard.quickAccess.production')}
           icon={<FaIndustry className="text-purple-500" size={24} />}
           href="/dashboard/production"
           bgColor="bg-purple-50 dark:bg-purple-900/20"
           textColor="text-purple-700 dark:text-purple-300"
         />
         <QuickAccessButton 
-          title="배송관리"
+          title={t('dashboard.quickAccess.shipping')}
           icon={<FaTruck className="text-orange-500" size={24} />}
           href="/dashboard/shipping"
           bgColor="bg-orange-50 dark:bg-orange-900/20"
           textColor="text-orange-700 dark:text-orange-300"
         />
         <QuickAccessButton 
-          title="사용자관리"
+          title={t('dashboard.quickAccess.admin')}
           icon={<FaUsers className="text-indigo-500" size={24} />}
           href="/dashboard/admin"
           bgColor="bg-indigo-50 dark:bg-indigo-900/20"
           textColor="text-indigo-700 dark:text-indigo-300"
         />
         <QuickAccessButton 
-          title="설정"
+          title={t('dashboard.quickAccess.settings')}
           icon={<FaCog className="text-gray-500" size={24} />}
           href="/dashboard/settings"
           bgColor="bg-gray-50 dark:bg-gray-800"
@@ -418,14 +420,14 @@ export default function Dashboard() {
       {/* 요약 카드 섹션 */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <DashboardCard 
-          title="총 자재 수" 
+          title={t('dashboard.card.totalInventory')} 
           value={inventorySummary.count.toString()} 
           icon={<FaBox className="text-blue-400" size={24} />}
           change="+5.2%"
           changeType="up"
         />
         <DashboardCard 
-          title="부족 재고 항목" 
+          title={t('dashboard.card.lowStockItems')} 
           value={inventorySummary.lowStock.toString()} 
           icon={<FaExclamationTriangle className="text-red-400" size={24} />}
           change="-2.1%"
@@ -433,7 +435,7 @@ export default function Dashboard() {
           color="red"
         />
         <DashboardCard 
-          title="구매 요청" 
+          title={t('dashboard.card.purchaseRequests')} 
           value={purchaseRequests.length.toString()} 
           icon={<FaShoppingCart className="text-green-400" size={24} />}
           change="+3.8%"
@@ -441,7 +443,7 @@ export default function Dashboard() {
           color="green"
         />
         <DashboardCard 
-          title="진행 중인 생산" 
+          title={t('dashboard.card.ongoingProduction')} 
           value={productionPlans.length.toString()} 
           icon={<FaIndustry className="text-purple-400" size={24} />}
           change="0%"
@@ -454,9 +456,9 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* 카테고리별 자재 현황 */}
         <SectionCard 
-          title="카테고리별 자재 현황" 
+          title={t('dashboard.section.inventoryCategory')} 
           icon={<FaBoxOpen className="text-blue-500" />}
-          link="자재관리로 이동"
+          link={t('dashboard.section.inventoryLink')}
           linkHref="/dashboard/inventory"
         >
           {inventoryCategories.length > 0 ? (
@@ -483,16 +485,16 @@ export default function Dashboard() {
           ) : (
             <div className="flex flex-col items-center justify-center py-8 text-gray-500 dark:text-gray-400">
               <FaBoxOpen size={32} className="mb-3 opacity-30" />
-              <p>자재 정보가 없습니다.</p>
+              <p>{t('dashboard.section.inventoryEmpty')}</p>
             </div>
           )}
         </SectionCard>
 
         {/* 최근 구매 요청 */}
         <SectionCard 
-          title="최근 구매 요청" 
+          title={t('dashboard.section.recentPurchaseRequests')} 
           icon={<FaShoppingCart className="text-green-500" />}
-          link="바로가기"
+          link={t('dashboard.section.purchaseLink')}
           linkHref="/dashboard/purchase"
         >
           {purchaseRequests.length > 0 ? (
@@ -514,16 +516,16 @@ export default function Dashboard() {
           ) : (
             <div className="flex flex-col items-center justify-center py-8 text-gray-500 dark:text-gray-400">
               <FaShoppingCart size={32} className="mb-3 opacity-30" />
-              <p>구매 요청이 없습니다.</p>
+              <p>{t('dashboard.section.purchaseEmpty')}</p>
             </div>
           )}
         </SectionCard>
 
         {/* 생산 일정 */}
         <SectionCard 
-          title="생산 일정" 
+          title={t('dashboard.section.productionSchedule')} 
           icon={<FaIndustry className="text-purple-500" />}
-          link="바로가기"
+          link={t('dashboard.section.productionLink')}
           linkHref="/dashboard/production"
         >
           {productionPlans.length > 0 ? (
@@ -546,7 +548,7 @@ export default function Dashboard() {
           ) : (
             <div className="flex flex-col items-center justify-center py-8 text-gray-500 dark:text-gray-400">
               <FaIndustry size={32} className="mb-3 opacity-30" />
-              <p>진행 중인 생산 계획이 없습니다.</p>
+              <p>{t('dashboard.section.productionEmpty')}</p>
             </div>
           )}
         </SectionCard>
@@ -554,9 +556,9 @@ export default function Dashboard() {
 
       {/* 출하 일정 */}
       <SectionCard 
-        title="출하 예정" 
+        title={t('dashboard.section.shippingSchedule')} 
         icon={<FaTruck className="text-blue-500" />}
-        link="바로가기"
+        link={t('dashboard.section.shippingLink')}
         linkHref="/dashboard/shipping"
       >
         {shippingPlans.length > 0 ? (
@@ -584,7 +586,7 @@ export default function Dashboard() {
         ) : (
           <div className="flex flex-col items-center justify-center py-16 text-gray-500 dark:text-gray-400">
             <FaTruck size={48} className="mb-4 opacity-30" />
-            <p className="text-xl">예정된 출하 계획이 없습니다.</p>
+            <p className="text-xl">{t('dashboard.section.shippingEmpty')}</p>
           </div>
         )}
       </SectionCard>
