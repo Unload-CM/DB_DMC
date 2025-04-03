@@ -1,6 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// 환경 변수 직접 하드코딩 (Vercel 배포 문제 해결용)
+// Supabase 접속 정보 (환경 변수 또는 하드코딩 값)
 const supabaseUrl = 'https://fpfinpuncamlpbbimwtu.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwZmlucHVuY2FtbHBiYmltd3R1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM2MDEwMzQsImV4cCI6MjA1OTE3NzAzNH0.PkUdieMcJbIvReXzmCw-glNQdn2Ni4XdIOHSbYx8hJE';
 
@@ -61,5 +61,28 @@ try {
   console.error('Supabase 클라이언트 초기화 실패:', error);
 }
 
-// 클라이언트 인스턴스 내보내기
-export const supabase = supabaseInstance || createClient(supabaseUrl, supabaseAnonKey); 
+// Supabase 클라이언트 생성 함수
+const createSupabaseClient = () => {
+  if (typeof window === 'undefined') {
+    // 서버 사이드 렌더링 중에는 동적으로 생성
+    return createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true
+      }
+    });
+  }
+
+  // 브라우저에서 실행 중일 때
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    }
+  });
+};
+
+// Supabase 클라이언트 인스턴스 생성 
+export const supabase = createSupabaseClient(); 
