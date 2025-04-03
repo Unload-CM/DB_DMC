@@ -374,7 +374,7 @@ function ShippingListTab({ onRefresh }: { onRefresh: () => void }) {
                   <td className="px-4 py-3">{shipping.model_name || '-'}</td>
                   <td className="px-4 py-3">{shipping.product_name || '-'}</td>
                   <td className="px-4 py-3">{shipping.quantity || 0}</td>
-                  <td className="px-4 py-3">{shipping.total_amount?.toLocaleString() || 0}원</td>
+                  <td className="px-4 py-3">{shipping.total_amount?.toLocaleString() || 0}฿</td>
                   <td className="px-4 py-3">{shipping.client_name || '-'}</td>
                   <td className="px-4 py-3">{new Date(shipping.shipping_date).toLocaleDateString()}</td>
                   <td className="px-4 py-3">
@@ -516,7 +516,7 @@ function ShippingListTab({ onRefresh }: { onRefresh: () => void }) {
                 <input
                   type="text"
                   readOnly
-                  value={`${newShipping.total_amount?.toLocaleString() || 0}원`}
+                  value={`${newShipping.total_amount?.toLocaleString() || 0}฿`}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 focus:outline-none dark:bg-gray-600 dark:border-gray-700 dark:text-gray-300"
                 />
               </div>

@@ -1067,7 +1067,7 @@ function InventoryListTab({ onRefresh, onViewDetail, onEdit, onDelete }: { onRef
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {item.unit_price ? `${item.unit_price.toLocaleString()}원` : '-'}
+                          {item.unit_price ? `${item.unit_price.toLocaleString()}฿` : '-'}
                         </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">

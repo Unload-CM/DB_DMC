@@ -362,14 +362,14 @@ function PurchaseRequestTab({ onRefresh }: { onRefresh: () => void }) {
                   <td className="px-4 py-3">{request.title}</td>
                   <td className="px-4 py-3">{isNaN(request.quantity) ? 0 : request.quantity}</td>
                   <td className="px-4 py-3">{request.vendor}</td>
-                  <td className="px-4 py-3">{isNaN(request.unit_price) ? 0 : request.unit_price?.toLocaleString()}원</td>
+                  <td className="px-4 py-3">{isNaN(request.unit_price) ? 0 : request.unit_price?.toLocaleString()}฿</td>
                   <td className="px-4 py-3">{
                     (() => {
                       const qty = isNaN(request.quantity) ? 0 : request.quantity;
                       const price = isNaN(request.unit_price) ? 0 : request.unit_price;
                       return (qty * price).toLocaleString();
                     })()
-                  }원</td>
+                  }฿</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                       request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
@@ -801,8 +801,8 @@ function PurchaseOrderTab({ onRefresh }: { onRefresh: () => void }) {
                   <td className="px-4 py-3">{order.title}</td>
                   <td className="px-4 py-3">{order.quantity}</td>
                   <td className="px-4 py-3">{order.vendor}</td>
-                  <td className="px-4 py-3">{order.unit_price?.toLocaleString()}원</td>
-                  <td className="px-4 py-3">{order.total_amount?.toLocaleString()}원</td>
+                  <td className="px-4 py-3">{order.unit_price?.toLocaleString()}฿</td>
+                  <td className="px-4 py-3">{order.total_amount?.toLocaleString()}฿</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                       order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
@@ -872,7 +872,7 @@ function PurchaseOrderTab({ onRefresh }: { onRefresh: () => void }) {
                     <option value="">요청을 선택하세요</option>
                     {approvedRequests.map(req => (
                       <option key={req.id} value={req.id}>
-                        {req.title} - {req.vendor} ({req.quantity}개, {req.unit_price?.toLocaleString()}원)
+                        {req.title} - {req.vendor} ({req.quantity}개, {req.unit_price?.toLocaleString()}฿)
                       </option>
                     ))}
                   </select>
@@ -1023,8 +1023,8 @@ function PurchaseListTab({ onRefresh }: { onRefresh: () => void }) {
                   <td className="px-4 py-3">{invoice.title}</td>
                   <td className="px-4 py-3">{invoice.vendor}</td>
                   <td className="px-4 py-3">{invoice.quantity}</td>
-                  <td className="px-4 py-3">{invoice.unit_price?.toLocaleString()}원</td>
-                  <td className="px-4 py-3">{invoice.total_amount?.toLocaleString()}원</td>
+                  <td className="px-4 py-3">{invoice.unit_price?.toLocaleString()}฿</td>
+                  <td className="px-4 py-3">{invoice.total_amount?.toLocaleString()}฿</td>
                   <td className="px-4 py-3">{new Date(invoice.issue_date).toLocaleDateString()}</td>
                   <td className="px-4 py-3">
                     <button
@@ -1321,8 +1321,8 @@ function VendorTab({ onRefresh }: { onRefresh: () => void }) {
                 <tr key={vendor.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
                   <td className="px-4 py-3">{vendor.name}</td>
                   <td className="px-4 py-3">{vendor.product_name}</td>
-                  <td className="px-4 py-3">{vendor.unit_price?.toLocaleString()}원</td>
-                  <td className="px-4 py-3">{vendor.updated_price ? `${vendor.updated_price.toLocaleString()}원` : '-'}</td>
+                  <td className="px-4 py-3">{vendor.unit_price?.toLocaleString()}฿</td>
+                  <td className="px-4 py-3">{vendor.updated_price ? `${vendor.updated_price.toLocaleString()}฿` : '-'}</td>
                   <td className="px-4 py-3">{vendor.location || '-'}</td>
                   <td className="px-4 py-3">{vendor.contact_person || '-'}</td>
                   <td className="px-4 py-3">{vendor.phone_number || '-'}</td>

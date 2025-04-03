@@ -181,7 +181,7 @@ export default function Register() {
             회원가입하시면 DMC ERP 시스템을 이용할 수 있습니다.
           </p>
           <p className="mt-1">
-            기술적인 문제가 발생하면 관리자에게 문의하세요.
+            기술적인 문제가 발생하면 Joon에게 문의하세요.
           </p>
         </div>
       </div>
