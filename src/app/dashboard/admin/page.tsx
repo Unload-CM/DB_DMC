@@ -3,11 +3,39 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { User } from '@/types';
-import { FaTools, FaUsers, FaSitemap, FaDatabase, FaSearch } from 'react-icons/fa';
+import { FaTools, FaUsers, FaSitemap, FaDatabase, FaSearch, FaUserTag, FaBox, FaShoppingCart, FaIndustry, FaTruck, FaCog } from 'react-icons/fa';
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<'user' | 'site' | 'data'>('user');
+  const [activeTab, setActiveTab] = useState<'user' | 'site' | 'data' | 'role'>('user');
   const [refreshFlag, setRefreshFlag] = useState(0);
+  const [userRole, setUserRole] = useState<'admin' | 'user' | null>(null);
+  
+  // 사용자 역할 확인
+  useEffect(() => {
+    const checkUserRole = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          // user_metadata가 없을 경우 처리
+          const userMeta = user.user_metadata || {};
+          const role = userMeta.role as 'admin' | 'user' || 'user';
+          setUserRole(role);
+          
+          // 관리자가 아닌 경우 대시보드로 리디렉션
+          if (role !== 'admin') {
+            window.location.href = '/dashboard';
+          }
+        } else {
+          // 로그인하지 않은 경우 로그인 페이지로 리디렉션
+          window.location.href = '/auth/login';
+        }
+      } catch (error) {
+        console.error('사용자 역할 확인 오류:', error);
+      }
+    };
+    
+    checkUserRole();
+  }, []);
   
   // 페이지 새로고침 함수
   const refreshPage = () => {
@@ -35,6 +63,12 @@ export default function AdminPage() {
             label="사용자 관리"
           />
           <TabButton 
+            isActive={activeTab === 'role'} 
+            onClick={() => setActiveTab('role')}
+            icon="🔑"
+            label="역할 관리"
+          />
+          <TabButton 
             isActive={activeTab === 'site'} 
             onClick={() => setActiveTab('site')}
             icon="🏗️"
@@ -50,6 +84,7 @@ export default function AdminPage() {
         
         <div className="p-6">
           {activeTab === 'user' && <UserManagementTab key={`user-${refreshFlag}`} onRefresh={refreshPage} />}
+          {activeTab === 'role' && <RoleManagementTab key={`role-${refreshFlag}`} onRefresh={refreshPage} />}
           {activeTab === 'site' && <SiteManagementTab key={`site-${refreshFlag}`} onRefresh={refreshPage} />}
           {activeTab === 'data' && <DataManagementTab key={`data-${refreshFlag}`} onRefresh={refreshPage} />}
         </div>
@@ -510,6 +545,412 @@ function UserManagementTab({ onRefresh }: { onRefresh: () => void }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// 역할 관리 탭
+function RoleManagementTab({ onRefresh }: { onRefresh: () => void }) {
+  const [isLoading, setIsLoading] = useState(true);
+  const [users, setUsers] = useState<User[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [showRoleModal, setShowRoleModal] = useState(false);
+  
+  // 기능 허용 설정
+  const [permissions, setPermissions] = useState<{
+    id: string;
+    user_id: string;
+    inventory: boolean;
+    purchase: boolean;
+    production: boolean;
+    shipping: boolean;
+    settings: boolean;
+    admin: boolean;
+  } | null>(null);
+  
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+  
+  const fetchUsers = async () => {
+    try {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .order('created_at', { ascending: false });
+          
+      if (error) throw error;
+      setUsers(data || []);
+    } catch (error: any) {
+      console.error('사용자 목록 로딩 오류:', error.message || error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const openRoleModal = async (user: User) => {
+    setSelectedUser(user);
+    
+    try {
+      // 기존 권한 설정 가져오기
+      const { data, error } = await supabase
+        .from('user_permissions')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+      
+      if (error && error.code !== 'PGRST116') { // PGRST116: not found
+        throw error;
+      }
+      
+      if (data) {
+        // 기존 설정이 있으면 불러오기
+        setPermissions(data);
+      } else {
+        // 기본 권한 설정 (없는 경우)
+        setPermissions({
+          id: '',
+          user_id: user.id,
+          inventory: user.role === 'admin',
+          purchase: user.role === 'admin',
+          production: user.role === 'admin',
+          shipping: user.role === 'admin',
+          settings: user.role === 'admin',
+          admin: user.role === 'admin'
+        });
+      }
+      
+      setShowRoleModal(true);
+    } catch (error) {
+      console.error('권한 설정 로드 오류:', error);
+      alert('권한 설정을 불러오는 중 오류가 발생했습니다.');
+    }
+  };
+  
+  const handlePermissionChange = (permission: string, value: boolean) => {
+    if (!permissions) return;
+    
+    setPermissions({
+      ...permissions,
+      [permission]: value
+    });
+  };
+  
+  const savePermissions = async () => {
+    if (!selectedUser || !permissions) return;
+    
+    try {
+      setIsLoading(true);
+      
+      // 기존 레코드가 있는지 확인
+      const { data: existingData, error: checkError } = await supabase
+        .from('user_permissions')
+        .select('id')
+        .eq('user_id', selectedUser.id);
+      
+      if (checkError) throw checkError;
+      
+      if (existingData && existingData.length > 0) {
+        // 기존 레코드 업데이트
+        const { error: updateError } = await supabase
+          .from('user_permissions')
+          .update({
+            inventory: permissions.inventory,
+            purchase: permissions.purchase,
+            production: permissions.production,
+            shipping: permissions.shipping,
+            settings: permissions.settings,
+            admin: permissions.admin
+          })
+          .eq('user_id', selectedUser.id);
+        
+        if (updateError) throw updateError;
+      } else {
+        // 새 레코드 생성
+        const { error: insertError } = await supabase
+          .from('user_permissions')
+          .insert([{
+            user_id: selectedUser.id,
+            inventory: permissions.inventory,
+            purchase: permissions.purchase,
+            production: permissions.production,
+            shipping: permissions.shipping,
+            settings: permissions.settings,
+            admin: permissions.admin
+          }]);
+        
+        if (insertError) throw insertError;
+      }
+      
+      // 사용자의 역할도 업데이트
+      if (permissions.admin && selectedUser.role !== 'admin') {
+        // admin 권한이 있으면 관리자로 설정
+        const { error: userUpdateError } = await supabase
+          .from('users')
+          .update({ role: 'admin' })
+          .eq('id', selectedUser.id);
+        
+        if (userUpdateError) throw userUpdateError;
+        
+        // 메타데이터도 업데이트
+        try {
+          const { data: userData } = await supabase.auth.getUser();
+          if (userData?.user) {
+            await supabase.auth.admin.updateUserById(
+              selectedUser.id,
+              { user_metadata: { full_name: selectedUser.full_name, role: 'admin' } }
+            );
+          }
+        } catch (metadataError) {
+          console.warn('Auth 메타데이터 업데이트 실패:', metadataError);
+        }
+      } else if (!permissions.admin && selectedUser.role === 'admin') {
+        // admin 권한이 없으면 일반 사용자로 설정
+        const { error: userUpdateError } = await supabase
+          .from('users')
+          .update({ role: 'user' })
+          .eq('id', selectedUser.id);
+        
+        if (userUpdateError) throw userUpdateError;
+        
+        // 메타데이터도 업데이트
+        try {
+          const { data: userData } = await supabase.auth.getUser();
+          if (userData?.user) {
+            await supabase.auth.admin.updateUserById(
+              selectedUser.id,
+              { user_metadata: { full_name: selectedUser.full_name, role: 'user' } }
+            );
+          }
+        } catch (metadataError) {
+          console.warn('Auth 메타데이터 업데이트 실패:', metadataError);
+        }
+      }
+      
+      onRefresh();
+      fetchUsers();
+      setShowRoleModal(false);
+      setSelectedUser(null);
+      
+      alert('권한 설정이 저장되었습니다.');
+    } catch (error: any) {
+      console.error('권한 설정 저장 오류:', error.message || error);
+      alert('권한 설정 저장 중 오류가 발생했습니다: ' + error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // 검색어에 따른 필터링
+  const filteredUsers = users.filter(user => 
+    (user.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (user.full_name?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+  );
+  
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-xl font-semibold text-blue-800 dark:text-blue-300">사용자 역할 및 권한 관리</h2>
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="이름 또는 이메일로 검색"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+          />
+          <FaSearch className="absolute left-3 top-3 text-gray-400" />
+        </div>
+      </div>
+      
+      {isLoading ? (
+        <div className="flex justify-center py-10">
+          <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
+      ) : filteredUsers.length > 0 ? (
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
+            <thead className="bg-gray-50 dark:bg-gray-800">
+              <tr>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">이름</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">이메일</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">역할</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">관리</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
+              {filteredUsers.map((user) => (
+                <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                  <td className="px-4 py-3">{user.full_name}</td>
+                  <td className="px-4 py-3">{user.email}</td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      user.role === 'admin' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300' : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
+                    }`}>
+                      {user.role === 'admin' ? '관리자' : '일반 사용자'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 space-x-2">
+                    <button
+                      onClick={() => openRoleModal(user)}
+                      className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                    >
+                      권한 설정
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center py-12 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <p className="text-gray-500 dark:text-gray-400 mb-4">등록된 사용자가 없습니다.</p>
+        </div>
+      )}
+      
+      {/* 역할 및 권한 설정 모달 */}
+      {showRoleModal && selectedUser && permissions && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-lg mx-4 p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">
+                <span className="text-blue-600 dark:text-blue-400">{selectedUser.full_name}</span> 권한 설정
+              </h3>
+              <button
+                onClick={() => setShowRoleModal(false)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="space-y-4 mb-6">
+              <div className="flex items-center justify-between p-3 border rounded-lg dark:border-gray-700">
+                <div className="flex items-center">
+                  <FaBox className="text-blue-500 mr-2" />
+                  <span className="font-medium">자재 관리</span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    className="sr-only peer" 
+                    checked={permissions.inventory}
+                    onChange={(e) => handlePermissionChange('inventory', e.target.checked)}
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+              
+              <div className="flex items-center justify-between p-3 border rounded-lg dark:border-gray-700">
+                <div className="flex items-center">
+                  <FaShoppingCart className="text-blue-500 mr-2" />
+                  <span className="font-medium">구매 관리</span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    className="sr-only peer" 
+                    checked={permissions.purchase}
+                    onChange={(e) => handlePermissionChange('purchase', e.target.checked)}
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+              
+              <div className="flex items-center justify-between p-3 border rounded-lg dark:border-gray-700">
+                <div className="flex items-center">
+                  <FaIndustry className="text-blue-500 mr-2" />
+                  <span className="font-medium">생산 관리</span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    className="sr-only peer" 
+                    checked={permissions.production}
+                    onChange={(e) => handlePermissionChange('production', e.target.checked)}
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+              
+              <div className="flex items-center justify-between p-3 border rounded-lg dark:border-gray-700">
+                <div className="flex items-center">
+                  <FaTruck className="text-blue-500 mr-2" />
+                  <span className="font-medium">출하 관리</span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    className="sr-only peer" 
+                    checked={permissions.shipping}
+                    onChange={(e) => handlePermissionChange('shipping', e.target.checked)}
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+              
+              <div className="flex items-center justify-between p-3 border rounded-lg dark:border-gray-700">
+                <div className="flex items-center">
+                  <FaCog className="text-blue-500 mr-2" />
+                  <span className="font-medium">설정</span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    className="sr-only peer" 
+                    checked={permissions.settings}
+                    onChange={(e) => handlePermissionChange('settings', e.target.checked)}
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+              
+              <div className="flex items-center justify-between p-3 border rounded-lg dark:border-gray-700 bg-purple-50 dark:bg-purple-900/20">
+                <div className="flex items-center">
+                  <FaTools className="text-purple-500 mr-2" />
+                  <span className="font-medium">관리자 패널 접근</span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    className="sr-only peer" 
+                    checked={permissions.admin}
+                    onChange={(e) => handlePermissionChange('admin', e.target.checked)}
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
+                </label>
+              </div>
+            </div>
+            
+            <p className="text-xs text-gray-500 mb-6 dark:text-gray-400">
+              관리자 패널 접근 권한을 활성화하면 해당 사용자는 자동으로 관리자 역할로 설정됩니다.
+              비활성화하면 일반 사용자 역할로 변경됩니다.
+            </p>
+            
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowRoleModal(false)}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg transition-colors"
+                disabled={isLoading}
+              >
+                취소
+              </button>
+              <button
+                onClick={savePermissions}
+                className="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50"
+                disabled={isLoading}
+              >
+                {isLoading ? '저장 중...' : '권한 저장'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1017,8 +1458,7 @@ function DataManagementTab({ onRefresh }: { onRefresh: () => void }) {
         console.log('백업 테이블이 없습니다. 생성을 시도합니다.');
         
         // Supabase 관리 콘솔에서 SQL 에디터로 테이블을 생성해야 함을 알림
-        alert('백업 테이블이 없습니다. Supabase 관리 콘솔에서 다음 SQL을 실행하여 테이블을 생성하세요:\n\n' + 
-              'CREATE TABLE db_backups (\n' +
+        alert('백업 테이블이 없습니다. Supabase 관리 콘솔에서 다음 SQL을 실행하여 테이블을 생성하세요:\n\nCREATE TABLE db_backups (\n' +
               '  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),\n' +
               '  backup_name TEXT NOT NULL,\n' +
               '  backup_type TEXT NOT NULL,\n' +
@@ -1261,10 +1701,9 @@ function DataManagementTab({ onRefresh }: { onRefresh: () => void }) {
       
       alert('백업이 삭제되었습니다.');
       fetchBackups();
-      
-    } catch (error: any) {
-      console.error('백업 삭제 오류:', error.message || error);
-      alert('백업 삭제 중 오류가 발생했습니다: ' + error.message);
+    } catch (error) {
+      console.error('백업 삭제 오류:', error);
+      alert('백업 삭제 중 오류가 발생했습니다.');
     }
   };
   
@@ -1307,7 +1746,7 @@ function DataManagementTab({ onRefresh }: { onRefresh: () => void }) {
           >
             {manualBackupLoading ? (
               <>
-                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
@@ -1334,10 +1773,10 @@ function DataManagementTab({ onRefresh }: { onRefresh: () => void }) {
                   <div className="relative">
                     <input
                       type="checkbox"
+                      className="sr-only peer"
                       checked={autoBackupEnabled}
                       onChange={handleToggleAutoBackup}
                       disabled={isAutoBackupLoading}
-                      className="sr-only"
                     />
                     <div className={`block w-14 h-8 rounded-full ${autoBackupEnabled ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'} transition-colors`}></div>
                     <div className={`absolute left-1 top-1 bg-white dark:bg-gray-200 w-6 h-6 rounded-full transition-transform transform ${autoBackupEnabled ? 'translate-x-6' : ''}`}></div>
@@ -1418,10 +1857,7 @@ function DataManagementTab({ onRefresh }: { onRefresh: () => void }) {
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
                   {backups.map((backup) => (
                     <tr key={backup.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-gray-900 dark:text-gray-100">{backup.backup_name}</div>
-                        <div className="text-xs text-gray-500">{backup.notes}</div>
-                      </td>
+                      <td className="px-4 py-3">{backup.backup_name}</td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                           backup.backup_type === 'manual' 

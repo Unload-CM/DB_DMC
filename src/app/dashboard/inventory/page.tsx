@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '@/lib/supabase';
 import { InventoryItem } from '@/types';
 import { createNotification } from '@/lib/notificationService';
@@ -15,6 +16,7 @@ interface ExtendedInventoryItem extends InventoryItem {
 }
 
 export default function InventoryPage() {
+  const { t } = useTranslation('common');
   const [activeTab, setActiveTab] = useState<'in' | 'out' | 'list'>('list');
   const [refreshFlag, setRefreshFlag] = useState(0);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -126,9 +128,9 @@ export default function InventoryPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-blue-900 dark:text-blue-300 flex items-center">
-            <FaBox className="mr-3 text-blue-500" /> 자재관리
+            <FaBox className="mr-3 text-blue-500" /> {t('inventory.title')}
           </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">자재 입고, 출고 및 목록을 관리합니다.</p>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">{t('inventory.description')}</p>
         </div>
       </div>
       
@@ -138,19 +140,19 @@ export default function InventoryPage() {
             isActive={activeTab === 'in'} 
             onClick={() => setActiveTab('in')}
             icon="📥"
-            label="자재 입고 (IN)"
+            label={t('inventory.tab.in')}
           />
           <TabButton 
             isActive={activeTab === 'out'} 
             onClick={() => setActiveTab('out')}
             icon="📤"
-            label="자재 출고 (OUT)"
+            label={t('inventory.tab.out')}
           />
           <TabButton 
             isActive={activeTab === 'list'} 
             onClick={() => setActiveTab('list')}
             icon="📋"
-            label="자재 목록"
+            label={t('inventory.tab.list')}
           />
         </div>
         
@@ -180,22 +182,14 @@ export default function InventoryPage() {
       {/* 결과 모달 */}
       {showResultModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md mx-4 p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className={`text-lg font-semibold ${
-                resultMessage.type === 'success' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-              }`}>
-                {resultMessage.type === 'success' ? '작업 성공' : '작업 실패'}
-              </h3>
-              <button
-                onClick={() => setShowResultModal(false)}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full shadow-xl">
+            <h3 className="text-xl font-bold mb-4 flex items-center">
+              {resultMessage.type === 'success' ? (
+                <span className="text-green-700 dark:text-green-400">✅ {t('common.success')}</span>
+              ) : (
+                <span className="text-red-700 dark:text-red-400">❌ {t('common.error')}</span>
+              )}
+            </h3>
             
             <div className={`p-4 rounded-lg mb-4 ${
               resultMessage.type === 'success' ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'
@@ -212,7 +206,7 @@ export default function InventoryPage() {
                 onClick={() => setShowResultModal(false)}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
-                확인
+                {t('common.confirm')}
               </button>
             </div>
           </div>
@@ -238,10 +232,10 @@ export default function InventoryPage() {
       {showDeleteModal && deleteItemId && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md mx-4 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">자재 삭제 확인</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t('inventory.modal.delete.title')}</h3>
             
             <p className="text-gray-700 dark:text-gray-300 mb-6">
-              <span className="font-medium text-red-600 dark:text-red-400">{deleteItemName}</span> 자재를 데이터베이스에서 영구적으로 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.
+              <span className="font-medium text-red-600 dark:text-red-400">{deleteItemName}</span> {t('inventory.modal.delete.message')}
             </p>
             
             <div className="flex justify-end space-x-3">
@@ -253,14 +247,14 @@ export default function InventoryPage() {
                 className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg transition-colors"
                 disabled={isDeleting}
               >
-                취소
+                {t('common.cancel')}
               </button>
               <button
                 onClick={() => deleteItemId && handleDeleteItem(deleteItemId)}
                 className="px-4 py-2 text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50"
                 disabled={isDeleting}
               >
-                {isDeleting ? '삭제 중...' : '삭제'}
+                {isDeleting ? t('inventory.modal.delete.deleting') : t('inventory.modal.delete.confirm')}
               </button>
             </div>
           </div>
@@ -926,6 +920,7 @@ function InventoryOutTab({ onRefresh }: { onRefresh: () => void }) {
 }
 
 function InventoryListTab({ onRefresh, onViewDetail, onEdit, onDelete }: { onRefresh: () => void; onViewDetail: (itemId: string) => void; onEdit: (itemId: string) => void; onDelete: (itemId: string, itemName: string) => void }) {
+  const { t } = useTranslation('common');
   const [inventoryItems, setInventoryItems] = useState<ExtendedInventoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -998,10 +993,10 @@ function InventoryListTab({ onRefresh, onViewDetail, onEdit, onDelete }: { onRef
   }, [inventoryItems, searchTerm, categoryFilter]);
 
   // 자재 유형 결정 (임시 로직: 수량에 따라 결정)
-  const getItemStatus = (quantity: number): '충분' | '부족' | '없음' => {
-    if (quantity <= 0) return '없음';
-    if (quantity < 10) return '부족';
-    return '충분';
+  const getItemStatus = (quantity: number): string => {
+    if (quantity <= 0) return t('inventory.status.out_of_stock');
+    if (quantity < 10) return t('inventory.status.low_stock');
+    return t('inventory.status.in_stock');
   };
 
   return (
@@ -1014,7 +1009,7 @@ function InventoryListTab({ onRefresh, onViewDetail, onEdit, onDelete }: { onRef
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="자재명, 코드, 카테고리 검색..."
+              placeholder={t('inventory.list.search_placeholder')}
               className="w-full md:w-64 pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm"
             />
             <span className="absolute left-3 top-2.5 text-gray-400">
@@ -1029,7 +1024,7 @@ function InventoryListTab({ onRefresh, onViewDetail, onEdit, onDelete }: { onRef
             onChange={(e) => setCategoryFilter(e.target.value)}
             className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm"
           >
-            <option value="">모든 카테고리</option>
+            <option value="">{t('inventory.list.all_categories')}</option>
             {categories.map((category, index) => (
               <option key={index} value={category}>{category}</option>
             ))}
@@ -1043,7 +1038,7 @@ function InventoryListTab({ onRefresh, onViewDetail, onEdit, onDelete }: { onRef
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
-          새로고침
+          {t('common.refresh')}
         </button>
       </div>
       
@@ -1056,20 +1051,20 @@ function InventoryListTab({ onRefresh, onViewDetail, onEdit, onDelete }: { onRef
         <div className="overflow-x-auto">
           {filteredItems.length === 0 ? (
             <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 text-center">
-              <p className="text-gray-500 dark:text-gray-400">자재 목록이 없습니다.</p>
+              <p className="text-gray-500 dark:text-gray-400">{t('inventory.list.no_items')}</p>
             </div>
           ) : (
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-800">
                 <tr>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">자재명</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">코드</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">카테고리</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">수량</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">단위</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">단가</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">상태</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">관리</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t('inventory.list.column.name')}</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t('inventory.list.column.code')}</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t('inventory.list.column.category')}</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t('inventory.list.column.quantity')}</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t('inventory.list.column.unit')}</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t('inventory.list.column.unit_price')}</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t('inventory.list.column.status')}</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t('inventory.list.column.actions')}</th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
@@ -1114,19 +1109,19 @@ function InventoryListTab({ onRefresh, onViewDetail, onEdit, onDelete }: { onRef
                             onClick={() => onViewDetail(item.id)}
                             className="px-2 py-1 text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
                           >
-                            상세
+                            {t('common.detail')}
                           </button>
                           <button
                             onClick={() => onEdit(item.id)}
                             className="px-2 py-1 text-xs text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 transition-colors"
                           >
-                            수정
+                            {t('common.edit')}
                           </button>
                           <button
                             onClick={() => onDelete(item.id, item.name)}
                             className="px-2 py-1 text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 transition-colors"
                           >
-                            삭제
+                            {t('common.delete')}
                           </button>
                         </div>
                       </td>

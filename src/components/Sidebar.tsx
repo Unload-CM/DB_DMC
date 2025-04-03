@@ -16,6 +16,9 @@ export default function Sidebar() {
   const [isOpen, setIsOpen] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [userRole, setUserRole] = useState<'admin' | 'user' | null>(null);
+  const [userName, setUserName] = useState<string>('');
+  const [userEmail, setUserEmail] = useState<string>('');
 
   // 현재 시간 업데이트
   useEffect(() => {
@@ -26,16 +29,44 @@ export default function Sidebar() {
     return () => clearInterval(timer);
   }, []);
 
+  // 사용자 정보와 역할 로드
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (user) {
+          // 사용자 메타데이터에서 역할 확인
+          const role = user.user_metadata?.role as 'admin' | 'user' || 'user';
+          const name = user.user_metadata?.full_name as string || user.email?.split('@')[0] || '사용자';
+          
+          setUserRole(role);
+          setUserName(name);
+          setUserEmail(user.email || '');
+        }
+      } catch (error) {
+        console.error('사용자 정보 로드 오류:', error);
+      }
+    };
+    
+    fetchUserData();
+  }, []);
+
   // 메뉴 아이템 정의 (i18n 적용)
   const menuItems = [
-    { name: t('sidebar.dashboard'), path: '/dashboard', icon: <FaChartLine size={20} /> },
-    { name: t('sidebar.inventory'), path: '/dashboard/inventory', icon: <FaBox size={20} /> },
-    { name: t('sidebar.purchase'), path: '/dashboard/purchase', icon: <FaShoppingCart size={20} /> },
-    { name: t('sidebar.production'), path: '/dashboard/production', icon: <FaIndustry size={20} /> },
-    { name: t('sidebar.shipping'), path: '/dashboard/shipping', icon: <FaTruck size={20} /> },
-    { name: t('sidebar.settings'), path: '/dashboard/settings', icon: <FaCog size={20} /> },
-    { name: '관리자 패널', path: '/dashboard/admin', icon: <FaTools size={20} /> },
+    { name: t('sidebar.dashboard'), path: '/dashboard', icon: <FaChartLine size={20} />, roles: ['admin', 'user'] },
+    { name: t('sidebar.inventory'), path: '/dashboard/inventory', icon: <FaBox size={20} />, roles: ['admin', 'user'] },
+    { name: t('sidebar.purchase'), path: '/dashboard/purchase', icon: <FaShoppingCart size={20} />, roles: ['admin', 'user'] },
+    { name: t('sidebar.production'), path: '/dashboard/production', icon: <FaIndustry size={20} />, roles: ['admin', 'user'] },
+    { name: t('sidebar.shipping'), path: '/dashboard/shipping', icon: <FaTruck size={20} />, roles: ['admin', 'user'] },
+    { name: t('sidebar.settings'), path: '/dashboard/settings', icon: <FaCog size={20} />, roles: ['admin', 'user'] },
+    { name: '관리자 패널', path: '/dashboard/admin', icon: <FaTools size={20} />, roles: ['admin'] },
   ];
+
+  // 역할에 따라 필터링된 메뉴 아이템
+  const filteredMenuItems = userRole 
+    ? menuItems.filter(item => item.roles.includes(userRole))
+    : menuItems.filter(item => item.roles.includes('user'));
 
   // 모바일에서 메뉴 아이템 클릭 시 메뉴 닫기
   const handleMobileMenuItemClick = () => {
@@ -132,7 +163,7 @@ export default function Sidebar() {
         {/* 네비게이션 메뉴 */}
         <nav className="mt-6">
           <ul className="space-y-2 px-2">
-            {menuItems.map((item) => {
+            {filteredMenuItems.map((item) => {
               const isActive = pathname.startsWith(item.path);
 
               return (
@@ -185,11 +216,14 @@ export default function Sidebar() {
             <div className="p-4 border-t border-blue-700">
               <div className="flex items-center">
                 <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center">
-                  <span className="font-bold text-lg">A</span>
+                  <span className="font-bold text-lg">{userName.charAt(0).toUpperCase()}</span>
                 </div>
                 <div className="ml-3">
-                  <p className="text-sm font-medium">관리자</p>
-                  <p className="text-xs text-blue-300">admin@example.com</p>
+                  <p className="text-sm font-medium">{userName}</p>
+                  <p className="text-xs text-blue-300">{userEmail}</p>
+                  <p className="text-xs mt-1 bg-blue-700/60 px-2 py-0.5 rounded-full inline-block">
+                    {userRole === 'admin' ? '관리자' : '일반 사용자'}
+                  </p>
                 </div>
               </div>
             </div>

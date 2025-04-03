@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '@/lib/supabase';
 import { PurchaseRequest, PurchaseOrder, Vendor } from '@/types';
 import { FaShoppingCart, FaClipboardCheck, FaListAlt, FaSearch, FaFilter, FaBuilding } from 'react-icons/fa';
 import { createNotification } from '@/lib/notificationService';
 
 export default function PurchasePage() {
+  const { t } = useTranslation('common');
   const [activeTab, setActiveTab] = useState<'request' | 'order' | 'list' | 'vendor'>('request');
   const [refreshFlag, setRefreshFlag] = useState(0);
   
@@ -21,9 +23,9 @@ export default function PurchasePage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-blue-900 dark:text-blue-300 flex items-center">
-            <FaShoppingCart className="mr-3 text-blue-500" /> 구매관리
+            <FaShoppingCart className="mr-3 text-blue-500" /> {t('purchase.title')}
           </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">구매 요청, 발주 및 발주서 목록을 관리합니다.</p>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">{t('purchase.description')}</p>
         </div>
       </div>
       
@@ -32,26 +34,20 @@ export default function PurchasePage() {
           <TabButton 
             isActive={activeTab === 'request'} 
             onClick={() => setActiveTab('request')}
-            icon="📌"
-            label="구매 요청"
+            icon={<FaShoppingCart className="mr-2" />}
+            label={t('purchase.tab.requests')}
           />
           <TabButton 
             isActive={activeTab === 'order'} 
             onClick={() => setActiveTab('order')}
-            icon="📝"
-            label="구매 발주"
-          />
-          <TabButton 
-            isActive={activeTab === 'list'} 
-            onClick={() => setActiveTab('list')}
-            icon="📄"
-            label="발주서 목록"
+            icon={<FaClipboardCheck className="mr-2" />}
+            label={t('purchase.tab.orders')}
           />
           <TabButton 
             isActive={activeTab === 'vendor'} 
             onClick={() => setActiveTab('vendor')}
-            icon="🏢"
-            label="업체 관리"
+            icon={<FaBuilding className="mr-2" />}
+            label={t('purchase.tab.vendors')}
           />
         </div>
         
@@ -74,7 +70,7 @@ function TabButton({
 }: { 
   isActive: boolean; 
   onClick: () => void; 
-  icon: string; 
+  icon: React.ReactNode; 
   label: string;
 }) {
   return (
@@ -86,7 +82,7 @@ function TabButton({
           : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/50'
       }`}
     >
-      <span className="mr-2 text-xl">{icon}</span>
+      {icon}
       <span>{label}</span>
       
       {/* 액티브 인디케이터 */}
