@@ -8,12 +8,22 @@ import {
   TruckIcon,
   CogIcon,
 } from '@heroicons/react/24/outline';
-import { InventoryItem } from '../../types';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import DashboardCard from '../../components/dashboard/DashboardCard';
 import InventoryCategoryChart from '../../components/dashboard/InventoryCategoryChart';
 import Link from 'next/link';
 import { useTranslation } from '../../hooks';
+
+interface InventoryItem {
+  id: string;
+  name: string;
+  description: string;
+  quantity: number;
+  unit: string;
+  category: string;
+  created_at: string;
+  updated_at: string;
+}
 
 export default function DashboardPage() {
   const { t } = useTranslation();

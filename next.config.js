@@ -7,7 +7,7 @@ const nextConfig = {
     // 기본 로케일
     defaultLocale: 'ko',
     // 자동 언어 감지 설정
-    localeDetection: true,
+    localeDetection: false,
   },
   webpack: (config, { isServer }) => {
     // JSON 파일을 모듈로 가져올 수 있도록 설정
