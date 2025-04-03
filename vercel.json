@@ -16,5 +16,6 @@
       "src": "next.config.js",
       "use": "@vercel/next"
     }
-  ]
+  ],
+  "alias": ["dmcthailand.vercel.app"]
 } 
