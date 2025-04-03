@@ -5,20 +5,14 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { FaBox, FaShoppingCart, FaIndustry, FaTruck, FaCog, FaTools, FaChartLine, FaBars, FaTimes, FaSignOutAlt } from 'react-icons/fa';
 import { supabase } from '@/lib/supabase';
-
-const menuItems = [
-  { name: '대시보드', path: '/dashboard', icon: <FaChartLine size={20} /> },
-  { name: '자재관리', path: '/dashboard/inventory', icon: <FaBox size={20} /> },
-  { name: '구매관리', path: '/dashboard/purchase', icon: <FaShoppingCart size={20} /> },
-  { name: '생산관리', path: '/dashboard/production', icon: <FaIndustry size={20} /> },
-  { name: '출하관리', path: '/dashboard/shipping', icon: <FaTruck size={20} /> },
-  { name: '설정', path: '/dashboard/settings', icon: <FaCog size={20} /> },
-  { name: '관리자 패널', path: '/dashboard/admin', icon: <FaTools size={20} /> },
-];
+import { useTranslation } from 'react-i18next';
+import LanguageSelector from './LanguageSelector';
+import '../lib/i18n';
 
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const { t, i18n } = useTranslation();
   const [isOpen, setIsOpen] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -31,6 +25,17 @@ export default function Sidebar() {
     
     return () => clearInterval(timer);
   }, []);
+
+  // 메뉴 아이템 정의 (i18n 적용)
+  const menuItems = [
+    { name: t('sidebar.dashboard'), path: '/dashboard', icon: <FaChartLine size={20} /> },
+    { name: t('sidebar.inventory'), path: '/dashboard/inventory', icon: <FaBox size={20} /> },
+    { name: t('sidebar.purchase'), path: '/dashboard/purchase', icon: <FaShoppingCart size={20} /> },
+    { name: t('sidebar.production'), path: '/dashboard/production', icon: <FaIndustry size={20} /> },
+    { name: t('sidebar.shipping'), path: '/dashboard/shipping', icon: <FaTruck size={20} /> },
+    { name: t('sidebar.settings'), path: '/dashboard/settings', icon: <FaCog size={20} /> },
+    { name: '관리자 패널', path: '/dashboard/admin', icon: <FaTools size={20} /> },
+  ];
 
   // 모바일에서 메뉴 아이템 클릭 시 메뉴 닫기
   const handleMobileMenuItemClick = () => {
@@ -46,6 +51,24 @@ export default function Sidebar() {
       router.push('/auth/login');
     } catch (error) {
       console.error('로그아웃 중 오류 발생:', error);
+    }
+  };
+
+  // 현재 언어에 맞는 날짜 형식 가져오기
+  const getLocalizedDate = () => {
+    try {
+      return currentTime.toLocaleDateString(i18n.language, { weekday: 'long' });
+    } catch (error) {
+      return currentTime.toLocaleDateString('ko-KR', { weekday: 'long' });
+    }
+  };
+
+  // 현재 언어에 맞는 시간 형식 가져오기
+  const getLocalizedTime = () => {
+    try {
+      return currentTime.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' });
+    } catch (error) {
+      return currentTime.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
     }
   };
 
@@ -99,9 +122,9 @@ export default function Sidebar() {
         {/* 시간 및 정보 섹션 */}
         {isOpen && (
           <div className="p-4 border-b border-blue-700 text-sm text-blue-300">
-            <p>{currentTime.toLocaleDateString('ko-KR', { weekday: 'long' })}</p>
+            <p>{getLocalizedDate()}</p>
             <p className="text-white font-semibold">
-              {currentTime.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+              {getLocalizedTime()}
             </p>
           </div>
         )}
@@ -140,6 +163,11 @@ export default function Sidebar() {
           </ul>
         </nav>
 
+        {/* 언어 선택기 */}
+        <div className="px-2 mt-6">
+          <LanguageSelector isCollapsed={!isOpen} />
+        </div>
+
         {/* 사용자 프로필 섹션 */}
         <div className="absolute bottom-0 left-0 right-0 border-t border-blue-700">
           {/* 로그아웃 버튼 */}
@@ -149,7 +177,7 @@ export default function Sidebar() {
               ${!isOpen && 'justify-center'}`}
           >
             <FaSignOutAlt size={20} />
-            {isOpen && <span className="ml-3">로그아웃</span>}
+            {isOpen && <span className="ml-3">{t('sidebar.logout')}</span>}
           </button>
 
           {/* 프로필 정보 */}
