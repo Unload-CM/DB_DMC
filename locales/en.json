@@ -55,7 +55,8 @@
     "no_data": "No data available",
     "good_morning": "Good morning",
     "hello": "Hello",
-    "good_evening": "Good evening"
+    "good_evening": "Good evening",
+    "unknown_error": "Unknown error"
   },
 
   "dashboard": {
@@ -87,7 +88,7 @@
   "inventory": {
     "title": "Inventory Management",
     "management": "Inventory Management",
-    "description": "inventory description",
+    "description": "Manage your inventory items, track stock levels, and monitor item movements",
     "list": "Inventory List",
     "new_item": "New Item",
     "item_name": "Item Name",
@@ -108,12 +109,65 @@
     "search_placeholder": "Search inventory items...",
     "select_all_categories": "All Categories",
     "column": {
-      "name": "INVENTORY LIST COLUMN NAME",
-      "code": "INVENTORY LIST COLUMN CODE",
-      "category": "INVENTORY LIST COLUMN CATEGORY",
-      "quantity": "INVENTORY LIST COLUMN QUANTITY",
-      "unit": "INVENTORY LIST COLUMN UNIT",
-      "unit_price": "INVENTORY LIST COLUMN UNIT PRICE"
+      "name": "Name",
+      "code": "Code",
+      "category": "Category",
+      "quantity": "Quantity",
+      "unit": "Unit",
+      "unit_price": "Unit Price"
+    },
+    "status": {
+      "in_stock": "In Stock",
+      "low_stock": "Low Stock",
+      "out_of_stock": "Out of Stock"
+    },
+    "message": {
+      "item_not_exist": "The item to be deleted does not exist. Refreshing page.",
+      "delete_success": "Item successfully deleted.",
+      "delete_error": "Error occurred while deleting the item",
+      "add_success": "Item successfully added to inventory.",
+      "add_error": "Error occurred while adding item",
+      "out_success": "Item successfully checked out from inventory.",
+      "out_error": "Error occurred while checking out item",
+      "item_not_found": "Selected item not found",
+      "insufficient_quantity": "Insufficient quantity available",
+      "fetch_error": "Error fetching inventory items",
+      "update_success": "Item successfully updated."
+    },
+    "modal": {
+      "delete": {
+        "title": "Delete Inventory Item",
+        "message": "will be permanently deleted. This action cannot be undone.",
+        "confirm": "Delete",
+        "deleting": "Deleting..."
+      },
+      "edit": {
+        "title": "Edit Inventory Item",
+        "saving": "Saving changes..."
+      },
+      "detail": {
+        "title": "Inventory Item Details",
+        "created_at": "Created At",
+        "updated_at": "Updated At"
+      }
+    },
+    "form": {
+      "item_name": "Item Name",
+      "category": "Category",
+      "category_placeholder": "Raw materials, parts, finished goods, etc.",
+      "category_helper": "Enter 'Raw Materials' to link with production planning.",
+      "quantity": "Quantity",
+      "unit": "Unit",
+      "description": "Description",
+      "item_type": "Item Type",
+      "type_in": "Check In (IN)",
+      "type_out": "Check Out (OUT)",
+      "type_in_helper": "Quantity will be set to 10 or higher.",
+      "type_out_helper": "Quantity will be set to 9 or lower.",
+      "loading_units": "Loading units...",
+      "processing": "Processing...",
+      "register_in": "Register Check In",
+      "register_out": "Register Check Out"
     }
   },
 
