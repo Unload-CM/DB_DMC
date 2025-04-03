@@ -55,7 +55,11 @@
     "success": "Success",
     "error": "Error",
     "confirm": "Confirm",
-    "select": "Select"
+    "select": "Select",
+    "no_data": "No data available",
+    "good_morning": "Good morning",
+    "hello": "Hello",
+    "good_evening": "Good evening"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -67,7 +71,8 @@
     "production_plans": "Production Plans",
     "shipping_plans": "Shipping Plans",
     "inventory_by_category": "Inventory by Category",
-    "view_all": "View All"
+    "view_all": "View All",
+    "welcome_message": "Welcome to your inventory management dashboard. Here's an overview of your current inventory status."
   },
   "inventory": {
     "title": "Inventory Management",
@@ -79,7 +84,10 @@
     "update_quantity": "Update Quantity",
     "low_stock": "Low Stock",
     "in_stock": "In Stock",
-    "out_of_stock": "Out of Stock"
+    "out_of_stock": "Out of Stock",
+    "item_count": "Item Count",
+    "total_quantity": "Total Quantity",
+    "no_category_data": "No inventory category data available."
   },
   "purchase": {
     "title": "Purchase Management",

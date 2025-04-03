@@ -17,7 +17,7 @@ import { Bar } from 'react-chartjs-2';
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement);
 
 export default function Dashboard() {
-  const { t } = useTranslation('common');
+  const { t, i18n } = useTranslation('common');
   const [isLoading, setIsLoading] = useState(true);
   const [greetingMessage, setGreetingMessage] = useState('');
   const [inventorySummary, setInventorySummary] = useState({ count: 0, lowStock: 0 });
@@ -32,22 +32,28 @@ export default function Dashboard() {
   const [lowStockGrowth, setLowStockGrowth] = useState<number>(0);
   const [purchaseGrowth, setPurchaseGrowth] = useState<number>(0);
   const [productionGrowth, setProductionGrowth] = useState<number>(0);
+  const [userName, setUserName] = useState('');
 
   useEffect(() => {
-    // 시간에 따른 인사말 설정
+    // 시간에 따른 인사말 설정 - 다국어 지원 추가
     const hours = new Date().getHours();
     let greeting = '';
     
     if (hours < 12) {
-      greeting = '좋은 아침입니다';
+      greeting = t('common.good_morning');
     } else if (hours < 18) {
-      greeting = '안녕하세요';
+      greeting = t('common.hello');
     } else {
-      greeting = '좋은 저녁입니다';
+      greeting = t('common.good_evening');
     }
     
     setGreetingMessage(greeting);
 
+    // 대시보드 데이터 로딩 함수 호출
+    fetchDashboardData();
+  }, [t]);
+
+  useEffect(() => {
     async function fetchDashboardData() {
       setIsLoading(true);
 
@@ -326,7 +332,7 @@ export default function Dashboard() {
     }
 
     fetchDashboardData();
-  }, []);
+  }, [t]);
 
   if (isLoading) {
     return (
@@ -340,256 +346,123 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-8">
-      {/* 헤더 섹션 */}
-      <header className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-6 backdrop-blur-sm bg-white/60 dark:bg-gray-800/60">
-        <div className="flex flex-col md:flex-row md:items-center justify-between">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-blue-900 dark:text-blue-300">{greetingMessage}, 관리자님</h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">{t('dashboard.description')}</p>
-          </div>
-          <div className="mt-4 md:mt-0 flex items-center">
-            <div className="relative">
-              <input 
-                type="text" 
-                placeholder={t('dashboard.search.placeholder')} 
-                className="pl-10 pr-4 py-2 rounded-full border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full md:w-64 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-              />
-              <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            </div>
-            <div className="relative ml-3">
-              <button className="p-2 rounded-full bg-blue-500 text-white hover:bg-blue-600 transition-colors shadow-md">
-                <FaBell />
-              </button>
-              {recentActivityCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  {recentActivityCount}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      </header>
-      
-      {/* 빠른 접근 버튼 */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        <QuickAccessButton 
-          title={t('dashboard.quickAccess.inventory')}
-          icon={<FaBox className="text-blue-500" size={24} />}
-          href="/dashboard/inventory"
-          bgColor="bg-blue-50 dark:bg-blue-900/20"
-          textColor="text-blue-700 dark:text-blue-300"
+    <div className="space-y-6">
+      {/* 헤더 및 요약 카드 섹션 */}
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">
+          {greetingMessage}, {userName}
+        </h1>
+        <p className="text-gray-600 dark:text-gray-400 max-w-3xl">
+          {t('dashboard.welcome_message')}
+        </p>
+      </div>
+
+      {/* 요약 카드 영역 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* 총 재고 카드 */}
+        <DashboardCard
+          icon={<FaWarehouse className="text-blue-600" size={24} />}
+          title={t('dashboard.total_inventory')}
+          value={inventorySummary.count.toString()}
+          trend={inventoryGrowth}
+          link="/dashboard/inventory"
         />
-        <QuickAccessButton 
-          title={t('dashboard.quickAccess.purchase')}
-          icon={<FaShoppingCart className="text-green-500" size={24} />}
-          href="/dashboard/purchase"
-          bgColor="bg-green-50 dark:bg-green-900/20"
-          textColor="text-green-700 dark:text-green-300"
+
+        {/* 부족 재고 카드 */}
+        <DashboardCard
+          icon={<FaExclamationTriangle className="text-red-500" size={24} />}
+          title={t('dashboard.low_stock')}
+          value={inventorySummary.lowStock.toString()}
+          trend={lowStockGrowth}
+          trendDirection="reverse"
+          link="/dashboard/inventory?filter=low"
         />
-        <QuickAccessButton 
-          title={t('dashboard.quickAccess.production')}
-          icon={<FaIndustry className="text-purple-500" size={24} />}
-          href="/dashboard/production"
-          bgColor="bg-purple-50 dark:bg-purple-900/20"
-          textColor="text-purple-700 dark:text-purple-300"
+
+        {/* 구매 요청 카드 */}
+        <DashboardCard
+          icon={<FaShoppingCart className="text-green-600" size={24} />}
+          title={t('dashboard.purchase_requests')}
+          value={purchaseRequests.length.toString()}
+          trend={purchaseGrowth}
+          link="/dashboard/purchase"
         />
-        <QuickAccessButton 
-          title={t('dashboard.quickAccess.shipping')}
-          icon={<FaTruck className="text-orange-500" size={24} />}
-          href="/dashboard/shipping"
-          bgColor="bg-orange-50 dark:bg-orange-900/20"
-          textColor="text-orange-700 dark:text-orange-300"
-        />
-        <QuickAccessButton 
-          title={t('dashboard.quickAccess.admin')}
-          icon={<FaUsers className="text-indigo-500" size={24} />}
-          href="/dashboard/admin"
-          bgColor="bg-indigo-50 dark:bg-indigo-900/20"
-          textColor="text-indigo-700 dark:text-indigo-300"
-        />
-        <QuickAccessButton 
-          title={t('dashboard.quickAccess.settings')}
-          icon={<FaCog className="text-gray-500" size={24} />}
-          href="/dashboard/settings"
-          bgColor="bg-gray-50 dark:bg-gray-800"
-          textColor="text-gray-700 dark:text-gray-300"
+
+        {/* 진행 중인 생산 계획 카드 */}
+        <DashboardCard
+          icon={<FaIndustry className="text-purple-600" size={24} />}
+          title={t('dashboard.production_plans')}
+          value={productionPlans.length.toString()}
+          trend={productionGrowth}
+          trend_display="neutral"
+          link="/dashboard/production"
         />
       </div>
 
-      {/* 요약 카드 섹션 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <DashboardCard 
-          title={t('dashboard.card.totalInventory')} 
-          value={inventorySummary.count.toString()} 
-          icon={<FaBox className="text-blue-400" size={24} />}
-          change="+5.2%"
-          changeType="up"
-        />
-        <DashboardCard 
-          title={t('dashboard.card.lowStockItems')} 
-          value={inventorySummary.lowStock.toString()} 
-          icon={<FaExclamationTriangle className="text-red-400" size={24} />}
-          change="-2.1%"
-          changeType="down"
-          color="red"
-        />
-        <DashboardCard 
-          title={t('dashboard.card.purchaseRequests')} 
-          value={purchaseRequests.length.toString()} 
-          icon={<FaShoppingCart className="text-green-400" size={24} />}
-          change="+3.8%"
-          changeType="up"
-          color="green"
-        />
-        <DashboardCard 
-          title={t('dashboard.card.ongoingProduction')} 
-          value={productionPlans.length.toString()} 
-          icon={<FaIndustry className="text-purple-400" size={24} />}
-          change="0%"
-          changeType="neutral"
-          color="purple"
-        />
-      </div>
-
-      {/* 정보 카드 그리드 */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* 카테고리별 자재 현황 */}
-        <SectionCard 
-          title={t('dashboard.section.inventoryCategory')} 
-          icon={<FaBoxOpen className="text-blue-500" />}
-          link={t('dashboard.section.inventoryLink')}
-          linkHref="/dashboard/inventory"
+      {/* 콘텐츠 영역 - 3열 그리드 */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {/* 재고 카테고리 차트 */}
+        <DashboardPanel
+          title={t('dashboard.inventory_by_category')}
+          icon={<FaBoxOpen size={18} />}
+          link="/dashboard/inventory"
+          className="xl:col-span-2"
         >
-          {inventoryCategories.length > 0 ? (
-            <div className="space-y-4">
-              {inventoryCategories.map((category, index) => (
-                <div key={index} className="flex items-center">
-                  <div className="w-32 text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
-                    {category.category}
-                  </div>
-                  <div className="flex-grow">
-                    <div className="relative h-4 overflow-hidden bg-gray-200 dark:bg-gray-700 rounded-full">
-                      <div 
-                        className={`absolute h-full bg-blue-${600 - index * 100} rounded-full`}
-                        style={{ width: `${Math.min(100, (category.count / inventorySummary.count) * 100)}%` }}
-                      ></div>
+          <InventoryCategoryChart 
+            inventoryCategories={inventoryCategories}
+          />
+        </DashboardPanel>
+
+        {/* 최근 활동 목록 */}
+        <DashboardPanel 
+          title={t('dashboard.recent_activity')} 
+          icon={<FaClipboardList size={18} />}
+        >
+          <div className="space-y-4">
+            {isLoading ? (
+              <div className="flex justify-center p-6">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+              </div>
+            ) : (
+              <>
+                {/* 최근 구매 요청 */}
+                {purchaseRequests.length > 0 ? (
+                  <div>
+                    <h4 className="text-sm uppercase tracking-wider text-gray-500 mb-3">{t('dashboard.purchase_requests')}</h4>
+                    <ul className="space-y-3">
+                      {purchaseRequests.slice(0, 3).map((request) => (
+                        <li key={request.id} className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
+                          <div className="flex justify-between">
+                            <div>
+                              <h5 className="font-medium">{request.title || t('purchase.new_request')}</h5>
+                              <p className="text-sm text-gray-500 dark:text-gray-400">
+                                {formatDate(request.created_at)}
+                              </p>
+                            </div>
+                            <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(request.status)}`}>
+                              {t(`purchase.request_${request.status}`)}
+                            </span>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="mt-3 text-right">
+                      <Link href="/dashboard/purchase" className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center justify-end">
+                        {t('dashboard.view_all')} <FaChevronRight className="ml-1" size={12} />
+                      </Link>
                     </div>
                   </div>
-                  <div className="w-12 text-right text-sm font-medium text-gray-700 dark:text-gray-300 ml-3">
-                    {category.count}
+                ) : (
+                  <div className="text-center p-4 text-gray-500 dark:text-gray-400">
+                    {t('common.no_data')}
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-8 text-gray-500 dark:text-gray-400">
-              <FaBoxOpen size={32} className="mb-3 opacity-30" />
-              <p>{t('dashboard.section.inventoryEmpty')}</p>
-            </div>
-          )}
-        </SectionCard>
-
-        {/* 최근 구매 요청 */}
-        <SectionCard 
-          title={t('dashboard.section.recentPurchaseRequests')} 
-          icon={<FaShoppingCart className="text-green-500" />}
-          link={t('dashboard.section.purchaseLink')}
-          linkHref="/dashboard/purchase"
-        >
-          {purchaseRequests.length > 0 ? (
-            <div className="divide-y dark:divide-gray-700">
-              {purchaseRequests.map((request) => (
-                <div key={request.id} className="py-3 flex justify-between items-center">
-                  <div>
-                    <p className="font-medium text-gray-900 dark:text-white">{request.title}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                      상태: <span className={`${getStatusColor(request.status)}`}>{request.status}</span>
-                    </p>
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    {formatDate(request.created_at)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-8 text-gray-500 dark:text-gray-400">
-              <FaShoppingCart size={32} className="mb-3 opacity-30" />
-              <p>{t('dashboard.section.purchaseEmpty')}</p>
-            </div>
-          )}
-        </SectionCard>
-
-        {/* 생산 일정 */}
-        <SectionCard 
-          title={t('dashboard.section.productionSchedule')} 
-          icon={<FaIndustry className="text-purple-500" />}
-          link={t('dashboard.section.productionLink')}
-          linkHref="/dashboard/production"
-        >
-          {productionPlans.length > 0 ? (
-            <div className="divide-y dark:divide-gray-700">
-              {productionPlans.map((plan) => (
-                <div key={plan.id} className="py-3">
-                  <div className="flex justify-between items-center">
-                    <p className="font-medium text-gray-900 dark:text-white">{plan.title}</p>
-                    <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full dark:bg-purple-900 dark:text-purple-300">
-                      진행중
-                    </span>
-                  </div>
-                  <div className="flex items-center text-sm text-gray-500 dark:text-gray-400 mt-2">
-                    <FaRegCalendarAlt className="mr-1" size={12} />
-                    {new Date(plan.start_date).toLocaleDateString()} ~ {new Date(plan.end_date).toLocaleDateString()}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-8 text-gray-500 dark:text-gray-400">
-              <FaIndustry size={32} className="mb-3 opacity-30" />
-              <p>{t('dashboard.section.productionEmpty')}</p>
-            </div>
-          )}
-        </SectionCard>
+                )}
+                
+                {/* 더 많은 활동 영역을 추가할 수 있음 */}
+              </>
+            )}
+          </div>
+        </DashboardPanel>
       </div>
-
-      {/* 출하 일정 */}
-      <SectionCard 
-        title={t('dashboard.section.shippingSchedule')} 
-        icon={<FaTruck className="text-blue-500" />}
-        link={t('dashboard.section.shippingLink')}
-        linkHref="/dashboard/shipping"
-      >
-        {shippingPlans.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {shippingPlans.map((plan) => (
-              <div key={plan.id} className="bg-white dark:bg-gray-700 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600 hover:shadow-md transition-shadow">
-                <div className="flex justify-between items-center mb-2">
-                  <p className="font-medium text-gray-900 dark:text-white">{plan.title}</p>
-                  <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center text-gray-500 dark:text-gray-400">
-                    <FaRegCalendarAlt className="mr-2" size={14} />
-                    {new Date(plan.shipping_date).toLocaleDateString()}
-                  </div>
-                  <p className="text-gray-600 dark:text-gray-300 line-clamp-2">{plan.description}</p>
-                  <div className="flex items-center text-gray-500 dark:text-gray-400">
-                    <FaTruck className="mr-2" size={14} />
-                    {plan.destination}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-16 text-gray-500 dark:text-gray-400">
-            <FaTruck size={48} className="mb-4 opacity-30" />
-            <p className="text-xl">{t('dashboard.section.shippingEmpty')}</p>
-          </div>
-        )}
-      </SectionCard>
     </div>
   );
 }
@@ -735,12 +608,18 @@ function formatDate(dateString: string) {
 }
 
 // 카테고리별 재고 차트 컴포넌트 개선
-const InventoryCategoryChart = () => {
+interface InventoryCategoryChartProps {
+  inventoryCategories: Array<{category: string, count: number, quantity: number}>;
+}
+
+const InventoryCategoryChart = ({ inventoryCategories }: InventoryCategoryChartProps) => {
+  const { t } = useTranslation('common');
+
   if (inventoryCategories.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-60 text-gray-500">
-        <div className="text-lg mb-2">데이터가 없습니다</div>
-        <p className="text-sm text-center">재고 카테고리 데이터가 없습니다.</p>
+        <div className="text-lg mb-2">{t('common.no_data')}</div>
+        <p className="text-sm text-center">{t('inventory.no_category_data')}</p>
       </div>
     );
   }
@@ -757,13 +636,13 @@ const InventoryCategoryChart = () => {
     labels: inventoryCategories.map(item => item.category),
     datasets: [
       {
-        label: '항목 수',
+        label: t('inventory.item_count'),
         data: inventoryCategories.map(item => item.count),
         backgroundColor: colors,
         borderWidth: 1,
       },
       {
-        label: '총 수량',
+        label: t('inventory.total_quantity'),
         data: inventoryCategories.map(item => item.quantity),
         backgroundColor: colors.map(color => color.replace(')', ', 0.7)')),
         borderWidth: 1,
@@ -780,7 +659,7 @@ const InventoryCategoryChart = () => {
       },
       title: {
         display: true,
-        text: '카테고리별 재고 현황'
+        text: t('dashboard.inventory_by_category')
       }
     }
   };

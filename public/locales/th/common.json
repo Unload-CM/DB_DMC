@@ -55,7 +55,11 @@
     "success": "สำเร็จ",
     "error": "ข้อผิดพลาด",
     "confirm": "ยืนยัน",
-    "select": "เลือก"
+    "select": "เลือก",
+    "no_data": "ไม่มีข้อมูล",
+    "good_morning": "สวัสดีตอนเช้า",
+    "hello": "สวัสดี",
+    "good_evening": "สวัสดีตอนเย็น"
   },
   "dashboard": {
     "title": "แดชบอร์ด",
@@ -67,7 +71,8 @@
     "production_plans": "แผนการผลิต",
     "shipping_plans": "แผนการจัดส่ง",
     "inventory_by_category": "สินค้าคงคลังตามหมวดหมู่",
-    "view_all": "ดูทั้งหมด"
+    "view_all": "ดูทั้งหมด",
+    "welcome_message": "ยินดีต้อนรับสู่แดชบอร์ดการจัดการสินค้าคงคลัง นี่คือภาพรวมของสถานะสินค้าคงคลังปัจจุบัน"
   },
   "inventory": {
     "title": "การจัดการสินค้าคงคลัง",
@@ -79,7 +84,10 @@
     "update_quantity": "อัปเดตจำนวน",
     "low_stock": "คงเหลือน้อย",
     "in_stock": "มีสินค้า",
-    "out_of_stock": "สินค้าหมด"
+    "out_of_stock": "สินค้าหมด",
+    "item_count": "จำนวนรายการ",
+    "total_quantity": "จำนวนรวม",
+    "no_category_data": "ไม่มีข้อมูลหมวดหมู่สินค้าคงคลัง"
   },
   "purchase": {
     "title": "การจัดการการซื้อ",
