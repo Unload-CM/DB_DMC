@@ -1,14 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  i18n: {
-    // 지원하는 언어 로케일 목록
-    locales: ['ko', 'en', 'th'],
-    // 기본 로케일
-    defaultLocale: 'ko',
-    // 자동 언어 감지 설정
-    localeDetection: false,
-  },
   webpack: (config, { isServer }) => {
     // JSON 파일을 모듈로 가져올 수 있도록 설정
     config.module.rules.push({
