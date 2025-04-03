@@ -1,19 +1,21 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import DashboardLayout from '../../components/layout/DashboardLayout';
+import Link from 'next/link';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import {
   ShoppingBagIcon,
-  ExclamationCircleIcon,
+  ExclamationCircleIcon, 
   TruckIcon,
   CogIcon,
+  ChevronRightIcon
 } from '@heroicons/react/24/outline';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import DashboardLayout from '../../components/layout/DashboardLayout';
 import DashboardCard from '../../components/dashboard/DashboardCard';
 import InventoryCategoryChart from '../../components/dashboard/InventoryCategoryChart';
-import Link from 'next/link';
 import { useTranslation } from '../../hooks';
 
+// 임시 인터페이스 정의
 interface InventoryItem {
   id: string;
   name: string;
@@ -25,6 +27,7 @@ interface InventoryItem {
   updated_at: string;
 }
 
+// 대시보드 컴포넌트 정의
 export default function DashboardPage() {
   const { t } = useTranslation();
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
@@ -32,8 +35,10 @@ export default function DashboardPage() {
   const supabase = createClientComponentClient();
 
   useEffect(() => {
+    // 재고 항목 데이터 가져오기
     const fetchInventoryItems = async () => {
       try {
+        setLoading(true);
         const { data, error } = await supabase
           .from('inventory')
           .select('*')
