@@ -56,7 +56,7 @@ export default function Register() {
             id: authData.user.id,
             user_email: email,
             full_name: fullName,
-            role: 'admin', // 첫 번째 사용자는 관리자로 설정
+            role: 'user', // 일반 사용자로 설정
             created_at: new Date().toISOString()
           }
         ]);
@@ -88,7 +88,7 @@ export default function Register() {
       <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-xl backdrop-blur-sm bg-opacity-80">
         <div className="text-center">
           <h1 className="text-3xl font-extrabold text-gray-900">
-            관리자 계정 등록
+            회원가입
           </h1>
           <p className="mt-2 text-sm text-gray-600">
             DMC ERP 시스템에 오신 것을 환영합니다
