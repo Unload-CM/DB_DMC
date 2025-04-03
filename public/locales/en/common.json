@@ -9,6 +9,22 @@
     "settings": "Settings",
     "logout": "Logout"
   },
+  "notification": {
+    "notifications": "Notifications",
+    "mark_all_as_read": "Mark all as read",
+    "no_notifications": "No notifications",
+    "close": "Close",
+    "just_now": "Just now",
+    "minutes_ago": "m ago",
+    "hours_ago": "h ago",
+    "days_ago": "d ago",
+    "inventory_added": "Inventory added",
+    "purchase_request_created": "Purchase request",
+    "purchase_request_approved": "Purchase request approved",
+    "purchase_order_created": "Purchase order",
+    "purchase_order_approved": "Purchase order approved",
+    "vendor_added": "Vendor added"
+  },
   "common": {
     "search": "Search",
     "add": "Add",

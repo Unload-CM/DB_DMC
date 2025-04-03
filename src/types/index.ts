@@ -169,4 +169,25 @@ export interface Client {
   user_id: string;            // 등록자
   created_at: string;
   updated_at: string;
-} 
+}
+
+// 알림 타입 정의
+export interface Notification {
+  id: string;
+  user_id: string;
+  user_name: string;
+  action_type: string;
+  content: string;
+  created_at: string;
+  is_read: boolean;
+  related_id?: string;
+  related_type?: string;
+}
+
+export type ActionType = 
+  | 'inventory_added' 
+  | 'purchase_request_created' 
+  | 'purchase_request_approved' 
+  | 'purchase_order_created'
+  | 'purchase_order_approved'
+  | 'vendor_added'; 

@@ -9,6 +9,22 @@
     "settings": "설정",
     "logout": "로그아웃"
   },
+  "notification": {
+    "notifications": "알림",
+    "mark_all_as_read": "모두 읽음으로 표시",
+    "no_notifications": "알림이 없습니다",
+    "close": "닫기",
+    "just_now": "방금 전",
+    "minutes_ago": "분 전",
+    "hours_ago": "시간 전",
+    "days_ago": "일 전",
+    "inventory_added": "자재 입고",
+    "purchase_request_created": "구매 요청",
+    "purchase_request_approved": "구매 요청 승인",
+    "purchase_order_created": "구매 발주",
+    "purchase_order_approved": "구매 발주 승인",
+    "vendor_added": "공급업체 추가"
+  },
   "common": {
     "search": "검색",
     "add": "추가",

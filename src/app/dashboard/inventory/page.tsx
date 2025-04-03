@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { InventoryItem } from '@/types';
+import { createNotification } from '@/lib/notificationService';
 import { FaBox, FaArrowDown, FaArrowUp, FaClipboardList, FaSearch, FaFilter } from 'react-icons/fa';
 // toast 모듈은 임시로 제거하고 alert으로 대체
 
@@ -514,6 +515,22 @@ ${sqlCommand}
           console.warn('자재가 추가되었으나 데이터를 조회할 수 없습니다.');
         } else {
           console.log('자재 입고 성공:', data[0]);
+          
+          // 현재 사용자 정보 가져오기
+          const { data: userData } = await supabase.auth.getUser();
+          if (userData?.user) {
+            // 알림 생성
+            const user = userData.user;
+            const userName = user.user_metadata?.name || user.email || '사용자';
+            await createNotification(
+              user.id,
+              userName,
+              'inventory_added',
+              `${userName}님이 자재 ${newItem.name} (${finalQuantity}${newItem.unit})을 ${itemType === 'IN' ? '입고' : '출고'}하였습니다.`,
+              data[0].id,
+              'inventory'
+            );
+          }
         }
         
         setMessage({
@@ -789,6 +806,22 @@ function InventoryOutTab({ onRefresh }: { onRefresh: () => void }) {
       if (updateError) throw updateError;
 
       console.log('자재 출고 성공:', selectedItemId, '수량:', outQuantity);
+
+      // 현재 사용자 정보 가져오기
+      const { data: userData } = await supabase.auth.getUser();
+      if (userData?.user) {
+        // 알림 생성
+        const user = userData.user;
+        const userName = user.user_metadata?.name || user.email || '사용자';
+        await createNotification(
+          user.id,
+          userName,
+          'inventory_added',
+          `${userName}님이 자재 ${selectedItemData.name} (${outQuantity}${selectedItemData.unit})을 출고하였습니다.`,
+          selectedItemId,
+          'inventory'
+        );
+      }
 
       setMessage({
         type: 'success',

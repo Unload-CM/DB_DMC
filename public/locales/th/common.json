@@ -9,6 +9,22 @@
     "settings": "การตั้งค่า",
     "logout": "ออกจากระบบ"
   },
+  "notification": {
+    "notifications": "การแจ้งเตือน",
+    "mark_all_as_read": "ทำเครื่องหมายว่าอ่านแล้วทั้งหมด",
+    "no_notifications": "ไม่มีการแจ้งเตือน",
+    "close": "ปิด",
+    "just_now": "เมื่อสักครู่",
+    "minutes_ago": "นาทีที่แล้ว",
+    "hours_ago": "ชั่วโมงที่แล้ว",
+    "days_ago": "วันที่แล้ว",
+    "inventory_added": "เพิ่มสินค้าคงคลัง",
+    "purchase_request_created": "คำขอซื้อ",
+    "purchase_request_approved": "อนุมัติคำขอซื้อ",
+    "purchase_order_created": "ใบสั่งซื้อ",
+    "purchase_order_approved": "อนุมัติใบสั่งซื้อ",
+    "vendor_added": "เพิ่มผู้ขาย"
+  },
   "common": {
     "search": "ค้นหา",
     "add": "เพิ่ม",

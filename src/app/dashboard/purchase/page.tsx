@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { PurchaseRequest, PurchaseOrder, Vendor } from '@/types';
 import { FaShoppingCart, FaClipboardCheck, FaListAlt, FaSearch, FaFilter, FaBuilding } from 'react-icons/fa';
+import { createNotification } from '@/lib/notificationService';
 
 export default function PurchasePage() {
   const [activeTab, setActiveTab] = useState<'request' | 'order' | 'list' | 'vendor'>('request');
@@ -245,6 +246,21 @@ function PurchaseRequestTab({ onRefresh }: { onRefresh: () => void }) {
       // 새로운 요청 추가 후 목록 새로고침
       onRefresh();
       fetchPurchaseRequests();
+      
+      // 알림 생성
+      if (data && data.length > 0 && userData.user) {
+        const newRequest = data[0];
+        const userName = userData.user.user_metadata?.name || userData.user.email || '사용자';
+        await createNotification(
+          userData.user.id,
+          userName,
+          'purchase_request_created',
+          `${userName}님이 구매 요청을 생성하였습니다: ${newRequest.title}`,
+          newRequest.id,
+          'purchase'
+        );
+      }
+      
       setShowAddModal(false);
       setNewRequest({
         title: '',
@@ -274,6 +290,32 @@ function PurchaseRequestTab({ onRefresh }: { onRefresh: () => void }) {
         .eq('id', id);
       
       if (error) throw error;
+      
+      // 승인 상태일 경우 알림 생성
+      if (newStatus === 'approved') {
+        // 구매 요청 정보 가져오기
+        const { data: requestData } = await supabase
+          .from('purchase_requests')
+          .select('*')
+          .eq('id', id)
+          .single();
+          
+        if (requestData) {
+          // 현재 사용자 정보 가져오기
+          const { data: userData } = await supabase.auth.getUser();
+          if (userData?.user) {
+            const userName = userData.user.user_metadata?.name || userData.user.email || '사용자';
+            await createNotification(
+              userData.user.id,
+              userName,
+              'purchase_request_approved',
+              `${userName}님이 구매 요청을 승인하였습니다: ${requestData.title}`,
+              id,
+              'purchase'
+            );
+          }
+        }
+      }
       
       // 목록 새로고침
       fetchPurchaseRequests();
@@ -637,6 +679,24 @@ function PurchaseOrderTab({ onRefresh }: { onRefresh: () => void }) {
       onRefresh();
       fetchPurchaseOrders();
       fetchApprovedRequests();
+      
+      // 알림 생성
+      if (data && data.length > 0) {
+        // 현재 사용자 정보 가져오기
+        const { data: userData } = await supabase.auth.getUser();
+        if (userData?.user) {
+          const userName = userData.user.user_metadata?.name || userData.user.email || '사용자';
+          await createNotification(
+            userData.user.id,
+            userName,
+            'purchase_order_created',
+            `${userName}님이 구매 발주를 생성하였습니다: ${data[0].title}`,
+            data[0].id,
+            'purchase'
+          );
+        }
+      }
+      
       setShowCreateModal(false);
       setSelectedRequest(null);
       setNewOrder({ status: 'pending' });
@@ -663,8 +723,31 @@ function PurchaseOrderTab({ onRefresh }: { onRefresh: () => void }) {
       
       if (error) throw error;
       
-      // 승인 상태일 경우 인보이스 생성
+      // 승인 상태일 경우 알림 생성 및 인보이스 생성
       if (newStatus === 'approved') {
+        // 구매 발주 정보 가져오기
+        const { data: orderData } = await supabase
+          .from('purchase_orders')
+          .select('*')
+          .eq('id', id)
+          .single();
+          
+        if (orderData) {
+          // 현재 사용자 정보 가져오기
+          const { data: userData } = await supabase.auth.getUser();
+          if (userData?.user) {
+            const userName = userData.user.user_metadata?.name || userData.user.email || '사용자';
+            await createNotification(
+              userData.user.id,
+              userName,
+              'purchase_order_approved',
+              `${userName}님이 구매 발주를 승인하였습니다: ${orderData.title}`,
+              id,
+              'purchase'
+            );
+          }
+        }
+        
         await createInvoice(id);
       }
       
@@ -1118,6 +1201,20 @@ function VendorTab({ onRefresh }: { onRefresh: () => void }) {
         .select();
       
       if (error) throw error;
+      
+      // 알림 생성
+      if (data && data.length > 0 && userData.user) {
+        const newVendorData = data[0];
+        const userName = userData.user.user_metadata?.name || userData.user.email || '사용자';
+        await createNotification(
+          userId,
+          userName,
+          'vendor_added',
+          `${userName}님이 새 업체를 등록하였습니다: ${newVendorData.name}`,
+          newVendorData.id,
+          'vendor'
+        );
+      }
       
       // 새로운 업체 추가 후 목록 새로고침
       fetchVendors();
