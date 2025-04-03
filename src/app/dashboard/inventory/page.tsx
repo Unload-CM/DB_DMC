@@ -1,10 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { InventoryItem } from '@/types';
 import { FaBox, FaArrowDown, FaArrowUp, FaClipboardList, FaSearch, FaFilter } from 'react-icons/fa';
+// toast 모듈은 임시로 제거하고 alert으로 대체
+
+// 타입 확장 (임시)
+interface ExtendedInventoryItem extends InventoryItem {
+  code?: string;
+  unit_price?: number;
+}
 
 export default function InventoryPage() {
   const [activeTab, setActiveTab] = useState<'in' | 'out' | 'list'>('list');
@@ -17,11 +24,99 @@ export default function InventoryPage() {
     type: 'success',
     message: ''
   });
-  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [inventoryItems, setInventoryItems] = useState<ExtendedInventoryItem[]>([]);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteItemId, setDeleteItemId] = useState<string | null>(null);
+  const [deleteItemName, setDeleteItemName] = useState<string>('');
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // 페이지 새로고침 함수
   const refreshPage = () => {
     setRefreshFlag(prev => prev + 1);
+  };
+
+  // 상세 보기 모달 열기
+  const openDetailModal = (itemId: string) => {
+    setSelectedItem(itemId);
+    setShowDetailModal(true);
+  };
+
+  // 수정 모달 열기
+  const openEditModal = (itemId: string) => {
+    setSelectedItem(itemId);
+    setShowEditModal(true);
+  };
+
+  // 삭제 모달 열기
+  const openDeleteModal = (itemId: string, itemName: string) => {
+    setDeleteItemId(itemId);
+    setDeleteItemName(itemName);
+    setShowDeleteModal(true);
+  };
+
+  // 자재 삭제 처리
+  const handleDeleteItem = async (id: string) => {
+    try {
+      setIsDeleting(true);
+      console.log('자재 삭제 시작:', id);
+      
+      // 삭제 전 다시 한번 확인을 위해 해당 항목이 존재하는지 확인
+      const { data: checkData, error: checkError } = await supabase
+        .from('inventory')
+        .select('id, name')
+        .eq('id', id)
+        .single();
+      
+      if (checkError) {
+        if (checkError.code === 'PGRST116') {
+          console.log('삭제할 항목이 이미 존재하지 않습니다:', id);
+          setResultMessage({
+            type: 'error',
+            message: '삭제할 항목이 이미 존재하지 않습니다. 페이지를 새로고침합니다.'
+          });
+          setShowResultModal(true);
+          refreshPage(); // 목록 다시 불러오기
+          setShowDeleteModal(false);
+          return;
+        }
+        throw checkError;
+      }
+      
+      // 실제 삭제 수행
+      const { error } = await supabase
+        .from('inventory')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('삭제 중 오류 발생:', error);
+        throw error;
+      }
+      
+      console.log('자재 삭제 성공:', id);
+
+      // 삭제 성공 모달 표시
+      setResultMessage({
+        type: 'success',
+        message: '자재가 성공적으로 삭제되었습니다.'
+      });
+      
+      // 모달 전환 (삭제 확인 모달 닫고 결과 모달 열기)
+      setShowDeleteModal(false);
+      setShowResultModal(true);
+      
+      // 페이지 새로고침
+      refreshPage();
+    } catch (error: any) {
+      console.error('자재 삭제 오류:', error);
+      setResultMessage({
+        type: 'error',
+        message: `자재 삭제 중 오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`
+      });
+      setShowResultModal(true);
+    } finally {
+      setIsDeleting(false);
+    }
   };
   
   return (
@@ -61,7 +156,15 @@ export default function InventoryPage() {
         <div className="p-6">
           {activeTab === 'in' && <InventoryInTab key={`in-${refreshFlag}`} onRefresh={refreshPage} />}
           {activeTab === 'out' && <InventoryOutTab key={`out-${refreshFlag}`} onRefresh={refreshPage} />}
-          {activeTab === 'list' && <InventoryListTab key={`list-${refreshFlag}`} onRefresh={refreshPage} />}
+          {activeTab === 'list' && 
+            <InventoryListTab 
+              key={`list-${refreshFlag}`} 
+              onRefresh={refreshPage} 
+              onViewDetail={openDetailModal}
+              onEdit={openEditModal}
+              onDelete={openDeleteModal}
+            />
+          }
         </div>
       </div>
       
@@ -125,8 +228,42 @@ export default function InventoryPage() {
               item.id === updatedItem.id ? updatedItem : item
             ));
             setShowEditModal(false);
+            refreshPage();
           }}
         />
+      )}
+
+      {/* 삭제 확인 모달 */}
+      {showDeleteModal && deleteItemId && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md mx-4 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">자재 삭제 확인</h3>
+            
+            <p className="text-gray-700 dark:text-gray-300 mb-6">
+              <span className="font-medium text-red-600 dark:text-red-400">{deleteItemName}</span> 자재를 데이터베이스에서 영구적으로 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.
+            </p>
+            
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeleteItemId(null);
+                }}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg transition-colors"
+                disabled={isDeleting}
+              >
+                취소
+              </button>
+              <button
+                onClick={() => deleteItemId && handleDeleteItem(deleteItemId)}
+                className="px-4 py-2 text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50"
+                disabled={isDeleting}
+              >
+                {isDeleting ? '삭제 중...' : '삭제'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -164,22 +301,118 @@ function TabButton({
 }
 
 function InventoryInTab({ onRefresh }: { onRefresh: () => void }) {
-  const [newItem, setNewItem] = useState<Partial<InventoryItem>>({
+  const [newItem, setNewItem] = useState<Partial<InventoryItem> & {unit_price?: number}>({
     name: '',
     description: '',
     quantity: 0,
+    unit: '',
     unit_price: 0,
     category: '',
   });
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [itemType, setItemType] = useState<'IN' | 'OUT'>('IN');
+  const [units, setUnits] = useState<{id: string, name: string, symbol: string}[]>([]);
+
+  useEffect(() => {
+    fetchUnits();
+  }, []);
+
+  const fetchUnits = async () => {
+    try {
+      console.log('단위 목록 조회 시작');
+      const { data, error } = await supabase
+        .from('units')
+        .select('id, name, symbol')
+        .order('name');
+
+      if (error) {
+        console.error('단위 목록 조회 오류:', error);
+        if (error.code === '42P01') { // 테이블이 존재하지 않는 경우
+          createUnitsTableIfNotExists();
+          return;
+        }
+        
+        if (error.message?.includes('not exist') || error.message?.includes('undefined')) {
+          createUnitsTableIfNotExists();
+          return;
+        }
+        
+        throw error;
+      }
+
+      console.log('단위 목록 조회 결과:', data?.length || 0);
+      
+      if (!data || data.length === 0) {
+        // 테이블은 있지만 데이터가 없는 경우
+        console.warn('단위 테이블에 데이터가 없습니다. 샘플 데이터를 추가하세요.');
+        createUnitsTableIfNotExists();
+        return;
+      }
+
+      setUnits(data);
+      // 첫 번째 단위로 기본값 설정
+      if (data.length > 0 && !newItem.unit) {
+        setNewItem(prev => ({ ...prev, unit: data[0].symbol }));
+      }
+    } catch (error) {
+      console.error('단위 목록 로딩 중 예상치 못한 오류:', error);
+      setMessage({
+        type: 'error',
+        text: '단위 목록을 불러오는 중 오류가 발생했습니다. 페이지를 새로고침하거나 관리자에게 문의하세요.'
+      });
+    }
+  };
+
+  const createUnitsTableIfNotExists = () => {
+    const sqlCommand = `
+-- units 테이블 생성
+CREATE TABLE IF NOT EXISTS units (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name VARCHAR NOT NULL,
+  symbol VARCHAR NOT NULL,
+  description TEXT,
+  category VARCHAR,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- units 테이블에 기본 데이터 입력
+INSERT INTO units (name, symbol, description, category) VALUES
+('미터', 'm', '길이의 SI 기본 단위', '길이'),
+('센티미터', 'cm', '미터의 1/100', '길이'),
+('밀리미터', 'mm', '미터의 1/1000', '길이'),
+('킬로그램', 'kg', '질량의 SI 기본 단위', '질량'),
+('그램', 'g', '킬로그램의 1/1000', '질량'),
+('리터', 'L', '부피의 단위', '부피'),
+('밀리리터', 'mL', '리터의 1/1000', '부피'),
+('제곱미터', 'm²', '면적의 단위', '면적'),
+('개', 'ea', '개수 단위', '수량'),
+('팩', 'pack', '묶음 단위', '수량'),
+('상자', 'box', '상자 단위', '수량'),
+('세트', 'set', '세트 단위', '수량')
+ON CONFLICT (id) DO NOTHING;
+`;
+
+    const message = `
+단위 테이블이 존재하지 않거나 데이터가 비어 있습니다.
+
+Supabase의 SQL 에디터에서 다음 명령을 실행한 후, 페이지를 새로고침 하세요:
+
+${sqlCommand}
+
+또는 관리자에게 문의하여 단위 테이블을 설정해달라고 요청하세요.
+`;
+
+    alert(message);
+    console.warn('단위 테이블 문제 감지됨');
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setNewItem({
       ...newItem,
-      [name]: name === 'quantity' || name === 'unit_price' ? parseFloat(value) : value,
+      [name]: name === 'quantity' ? parseFloat(value) : value,
     });
   };
 
@@ -201,6 +434,37 @@ function InventoryInTab({ onRefresh }: { onRefresh: () => void }) {
     setMessage(null);
 
     try {
+      // 단위가 선택되지 않았는지 확인
+      if (!newItem.unit) {
+        throw new Error('단위를 선택해주세요. 단위가 없다면 단위 테이블을 먼저 생성해야 합니다.');
+      }
+
+      // Supabase 설정 확인
+      if (!supabase) {
+        throw new Error('Supabase 클라이언트가 초기화되지 않았습니다. 페이지를 새로고침하거나 관리자에게 문의하세요.');
+      }
+
+      // 네트워크 연결 확인
+      if (!navigator.onLine) {
+        throw new Error('인터넷 연결이 끊어졌습니다. 네트워크 연결을 확인하고 다시 시도해주세요.');
+      }
+
+      // Supabase 연결 확인 (타입 안전하게 처리)
+      try {
+        // 임의 속성 확인을 위한
+        const supabaseAny = supabase as any;
+        if (typeof supabaseAny.checkConnection === 'function') {
+          const connectionStatus = await supabaseAny.checkConnection();
+          if (!connectionStatus.ok) {
+            console.error('Supabase 연결 상태 확인 실패:', connectionStatus.error);
+            throw new Error('데이터베이스 연결에 실패했습니다. 잠시 후 다시 시도하거나 관리자에게 문의하세요.');
+          }
+        }
+      } catch (connError) {
+        console.warn('Supabase 연결 확인 중 오류:', connError);
+        // 연결 확인 실패는 무시하고 계속 진행
+      }
+
       // 타입에 따른 수량 검증
       let finalQuantity = newItem.quantity || 0;
       if (itemType === 'IN' && finalQuantity < 10) {
@@ -209,34 +473,68 @@ function InventoryInTab({ onRefresh }: { onRefresh: () => void }) {
         finalQuantity = 9;
       }
 
-      const { data, error } = await supabase
-        .from('inventory')
-        .insert([
-          {
-            ...newItem,
-            quantity: finalQuantity,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        ])
-        .select();
+      console.log('자재 입고 시도:', { ...newItem, quantity: finalQuantity });
 
-      if (error) throw error;
-
-      console.log('자재 입고 성공:', data);
-
-      setMessage({
-        type: 'success',
-        text: `자재가 성공적으로 ${itemType === 'IN' ? '입고' : '출고'}되었습니다.`,
-      });
-      setNewItem({
-        name: '',
-        description: '',
-        quantity: 0,
-        unit_price: 0,
-        category: '',
-      });
-      setItemType('IN');
+      const itemToInsert = {
+        name: newItem.name,
+        description: newItem.description,
+        quantity: finalQuantity,
+        category: newItem.category,
+        unit_price: 0, // 데이터베이스 호환성을 위해 추가
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      
+      // 오류 처리를 위해 두 단계로 나눔
+      try {
+        const response = await supabase
+          .from('inventory')
+          .insert([itemToInsert]);
+          
+        // 삽입 오류 확인
+        if (response.error) {
+          console.error('Supabase 삽입 오류:', response.error);
+          throw new Error(response.error.message || response.error.details || '자재 등록 중 데이터베이스 오류가 발생했습니다.');
+        }
+        
+        // 삽입된 데이터 조회
+        const { data, error } = await supabase
+          .from('inventory')
+          .select('*')
+          .eq('name', newItem.name)
+          .order('created_at', { ascending: false })
+          .limit(1);
+          
+        if (error) {
+          console.error('데이터 확인 오류:', error);
+          throw error;
+        }
+        
+        if (!data || data.length === 0) {
+          console.warn('자재가 추가되었으나 데이터를 조회할 수 없습니다.');
+        } else {
+          console.log('자재 입고 성공:', data[0]);
+        }
+        
+        setMessage({
+          type: 'success',
+          text: `자재가 성공적으로 ${itemType === 'IN' ? '입고' : '출고'}되었습니다.`,
+        });
+        
+        setNewItem({
+          name: '',
+          description: '',
+          quantity: 0,
+          unit: '',
+          unit_price: 0,
+          category: '',
+        });
+        
+        setItemType('IN');
+      } catch (insertError: any) {
+        console.error('Supabase 작업 오류:', insertError);
+        throw new Error(insertError.message || insertError.details || '자재 등록 중 데이터베이스 오류가 발생했습니다.');
+      }
       
       // 부모 컴포넌트에 새로고침 신호 전달
       setTimeout(() => {
@@ -246,7 +544,10 @@ function InventoryInTab({ onRefresh }: { onRefresh: () => void }) {
       console.error('자재 입고 오류:', error);
       setMessage({
         type: 'error',
-        text: error.message || '자재 등록 중 오류가 발생했습니다.',
+        text: error.message || 
+              error.error_description || 
+              error.details || 
+              (error.code ? `오류 코드: ${error.code}` : '자재 등록 중 오류가 발생했습니다. 네트워크 연결을 확인하거나 관리자에게 문의하세요.'),
       });
     } finally {
       setIsLoading(false);
@@ -304,14 +605,20 @@ function InventoryInTab({ onRefresh }: { onRefresh: () => void }) {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               카테고리
             </label>
-            <input
-              type="text"
-              name="category"
-              value={newItem.category}
-              onChange={handleChange}
-              className="w-full p-2 border rounded-md"
-              required
-            />
+            <div className="relative">
+              <input
+                type="text"
+                name="category"
+                value={newItem.category}
+                onChange={handleChange}
+                className="w-full p-2 border rounded-md"
+                required
+                placeholder="원자재, 부품, 완제품 등"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                생산계획에 연동하려면 카테고리를 '원자재'로 입력하세요.
+              </p>
+            </div>
           </div>
           
           <div>
@@ -332,18 +639,24 @@ function InventoryInTab({ onRefresh }: { onRefresh: () => void }) {
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              단가
+              단위
             </label>
-            <input
-              type="number"
-              name="unit_price"
-              min="0"
-              step="0.01"
-              value={newItem.unit_price}
+            <select
+              name="unit"
+              value={newItem.unit || ''}
               onChange={handleChange}
               className="w-full p-2 border rounded-md"
               required
-            />
+            >
+              {units.length === 0 && (
+                <option value="">단위를 로드하는 중...</option>
+              )}
+              {units.map((unit) => (
+                <option key={unit.id} value={unit.symbol}>
+                  {unit.name} ({unit.symbol})
+                </option>
+              ))}
+            </select>
           </div>
         </div>
         
@@ -379,6 +692,7 @@ function InventoryInTab({ onRefresh }: { onRefresh: () => void }) {
 function InventoryOutTab({ onRefresh }: { onRefresh: () => void }) {
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [selectedItemId, setSelectedItemId] = useState<string>('');
+  const [selectedItemUnit, setSelectedItemUnit] = useState<string>('');
   const [outQuantity, setOutQuantity] = useState<number>(1);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -416,6 +730,21 @@ function InventoryOutTab({ onRefresh }: { onRefresh: () => void }) {
   useEffect(() => {
     fetchInventoryItems();
   }, []);
+
+  const handleItemChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const itemId = e.target.value;
+    setSelectedItemId(itemId);
+    
+    // 선택된 아이템의 단위 정보 설정
+    if (itemId) {
+      const selectedItem = inventoryItems.find(item => item.id === itemId);
+      if (selectedItem) {
+        setSelectedItemUnit(selectedItem.unit);
+      }
+    } else {
+      setSelectedItemUnit('');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -508,44 +837,51 @@ function InventoryOutTab({ onRefresh }: { onRefresh: () => void }) {
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              출고할 자재
-            </label>
-            <select
-              value={selectedItemId}
-              onChange={(e) => setSelectedItemId(e.target.value)}
-              className="w-full p-2 border rounded-md"
-              required
-            >
-              <option value="">자재를 선택하세요</option>
-              {inventoryItems.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name} - 현재 재고: {item.quantity}
-                </option>
-              ))}
-            </select>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              출고 수량
-            </label>
-            <input
-              type="number"
-              min="1"
-              value={outQuantity}
-              onChange={(e) => setOutQuantity(parseInt(e.target.value))}
-              className="w-full p-2 border rounded-md"
-              required
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                출고할 자재 선택
+              </label>
+              <select
+                value={selectedItemId}
+                onChange={handleItemChange}
+                className="w-full p-2 border rounded-md"
+                required
+              >
+                <option value="">자재를 선택하세요</option>
+                {inventoryItems.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name} (재고: {item.quantity} {item.unit})
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                출고 수량
+              </label>
+              <div className="flex items-center">
+                <input
+                  type="number"
+                  value={outQuantity}
+                  onChange={(e) => setOutQuantity(parseInt(e.target.value))}
+                  min="1"
+                  className="w-full p-2 border rounded-md"
+                  required
+                />
+                {selectedItemUnit && (
+                  <span className="ml-2 text-gray-500">{selectedItemUnit}</span>
+                )}
+              </div>
+            </div>
           </div>
           
           <div className="flex justify-end">
             <button
               type="submit"
-              disabled={isLoading || !selectedItemId}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
+              disabled={isLoading}
+              className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors disabled:opacity-50"
             >
               {isLoading ? '처리 중...' : '출고 등록'}
             </button>
@@ -556,345 +892,217 @@ function InventoryOutTab({ onRefresh }: { onRefresh: () => void }) {
   );
 }
 
-function InventoryListTab({ onRefresh }: { onRefresh: () => void }) {
-  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+function InventoryListTab({ onRefresh, onViewDetail, onEdit, onDelete }: { onRefresh: () => void; onViewDetail: (itemId: string) => void; onEdit: (itemId: string) => void; onDelete: (itemId: string, itemName: string) => void }) {
+  const [inventoryItems, setInventoryItems] = useState<ExtendedInventoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [categories, setCategories] = useState<string[]>([]);
-  const [selectedItem, setSelectedItem] = useState<string | null>(null);
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showResultModal, setShowResultModal] = useState(false);
-  const [resultMessage, setResultMessage] = useState<{type: 'success' | 'error', message: string}>({
-    type: 'success',
-    message: ''
-  });
-  const [deleteItemId, setDeleteItemId] = useState<string | null>(null);
-  const [deleteItemName, setDeleteItemName] = useState<string>('');
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // 자재 목록 로드 함수
-  const fetchInventoryItems = async () => {
+  // 모든 자재 정보 가져오기
+  const fetchInventory = async () => {
+    setIsLoading(true);
+    
     try {
-      setIsLoading(true);
-      console.log('자재 목록 조회 시작');
-      
-      const { data, error } = await supabase
+      // 기본 테이블에서 먼저 조회
+      let { data, error } = await supabase
         .from('inventory')
         .select('*')
-        .order('name');
-
+        .order('created_at', { ascending: false });
+      
       if (error) {
-        console.error('자재 목록 조회 오류:', error);
-        throw error;
+        if (error.code === 'PGRST116') {
+          // 기본 테이블이 없는 경우 inventory_items 테이블에서 조회 시도
+          const { data: altData, error: altError } = await supabase
+            .from('inventory_items')
+            .select('*')
+            .order('created_at', { ascending: false });
+          
+          if (altError) {
+            throw altError;
+          }
+          
+          data = altData || [];
+        } else {
+          throw error;
+        }
       }
+
+      // 자재 목록 설정
+      setInventoryItems(data || []);
       
-      console.log('자재 목록 조회 성공:', data?.length || 0, '개의 항목');
-      
-      if (data) {
-        setInventoryItems(data);
-        // 카테고리 목록 추출
-        const uniqueCategories = [...new Set(data.map(item => item.category))];
-        setCategories(uniqueCategories);
-      }
-    } catch (error) {
-      console.error('자재 목록 로딩 오류:', error);
+      // 카테고리 목록 추출
+      const uniqueCategories = Array.from(new Set(data?.map(item => item.category) || []));
+      setCategories(uniqueCategories);
+
+    } catch (error: any) {
+      console.error('자재 목록 조회 오류:', error);
+      alert(`자재 목록 조회 실패: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // 자재 목록 최초 로드
+  // 마운트 시 자재 목록 로드
   useEffect(() => {
-    fetchInventoryItems();
+    fetchInventory();
   }, []);
 
-  // 필터링된 자재 목록
-  const filteredItems = inventoryItems.filter(item => {
-    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        item.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = categoryFilter === '' || item.category === categoryFilter;
-    return matchesSearch && matchesCategory;
-  });
-
-  // 삭제 처리
-  const handleDeleteItem = async (id: string) => {
-    try {
-      setIsDeleting(true);
-      console.log('자재 삭제 시작:', id);
+  // 검색어로 필터링된 자재 목록
+  const filteredItems = useMemo(() => {
+    return inventoryItems.filter(item => {
+      const nameMatch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const codeMatch = item.code?.toLowerCase().includes(searchTerm.toLowerCase()) || false;
+      const categoryMatch = item.category?.toLowerCase().includes(searchTerm.toLowerCase()) || false;
+      const descriptionMatch = item.description?.toLowerCase().includes(searchTerm.toLowerCase()) || false;
       
-      // 삭제 전 다시 한번 확인을 위해 해당 항목이 존재하는지 확인
-      const { data: checkData, error: checkError } = await supabase
-        .from('inventory')
-        .select('id, name')
-        .eq('id', id)
-        .single();
+      const searchMatch = nameMatch || codeMatch || categoryMatch || descriptionMatch;
+      const categoryFilterMatch = categoryFilter ? item.category === categoryFilter : true;
       
-      if (checkError) {
-        if (checkError.code === 'PGRST116') {
-          console.log('삭제할 항목이 이미 존재하지 않습니다:', id);
-          setResultMessage({
-            type: 'error',
-            message: '삭제할 항목이 이미 존재하지 않습니다. 페이지를 새로고침합니다.'
-          });
-          setShowResultModal(true);
-          await fetchInventoryItems(); // 목록 다시 불러오기
-          setShowDeleteModal(false);
-          return;
-        }
-        throw checkError;
-      }
-      
-      // 실제 삭제 수행 - RPC 호출로 강제 삭제
-      const { error } = await supabase
-        .from('inventory')
-        .delete()
-        .eq('id', id);
-
-      if (error) {
-        console.error('삭제 중 오류 발생:', error);
-        throw error;
-      }
-      
-      // 삭제 후 확인을 위해 아이템이 정말 삭제되었는지 체크
-      const { data: verifyData, error: verifyError } = await supabase
-        .from('inventory')
-        .select('id')
-        .eq('id', id);
-        
-      if (verifyError) {
-        console.error('삭제 확인 중 오류 발생:', verifyError);
-      }
-      
-      // 항목이 여전히 존재하는지 확인
-      if (verifyData && verifyData.length > 0) {
-        console.error('삭제 실패: 항목이 여전히 존재합니다', id);
-        setResultMessage({
-          type: 'error',
-          message: '삭제가 완료되지 않았습니다. 다시 시도해주세요.'
-        });
-        setShowResultModal(true);
-        return;
-      }
-      
-      console.log('자재 삭제 성공:', id);
-
-      // 목록 다시 불러오기
-      await fetchInventoryItems();
-      
-      // 삭제 성공 모달 표시
-      setResultMessage({
-        type: 'success',
-        message: '자재가 성공적으로 삭제되었습니다.'
-      });
-      
-      // 모달 전환 (삭제 확인 모달 닫고 결과 모달 열기)
-      setShowDeleteModal(false);
-      setShowResultModal(true);
-      
-      // 부모 컴포넌트에 새로고침 신호 전달
-      setTimeout(() => {
-        onRefresh();
-      }, 1000);
-    } catch (error: any) {
-      console.error('자재 삭제 오류:', error);
-      setResultMessage({
-        type: 'error',
-        message: `자재 삭제 중 오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`
-      });
-      setShowResultModal(true);
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  // 삭제 모달 열기
-  const openDeleteModal = (id: string) => {
-    const item = inventoryItems.find(item => item.id === id);
-    if (item) {
-      setDeleteItemId(id);
-      setDeleteItemName(item.name);
-      setShowDeleteModal(true);
-    }
-  };
-
-  // 상세 보기 처리
-  const handleViewDetail = (id: string) => {
-    setSelectedItem(id);
-    setShowDetailModal(true);
-  };
-
-  // 수정 처리
-  const handleEdit = (id: string) => {
-    setSelectedItem(id);
-    setShowEditModal(true);
-  };
+      return searchMatch && categoryFilterMatch;
+    });
+  }, [inventoryItems, searchTerm, categoryFilter]);
 
   // 자재 유형 결정 (임시 로직: 수량에 따라 결정)
-  const getItemType = (item: InventoryItem) => {
-    // 실제로는 데이터베이스에서 구분 정보를 가져와야 하며
-    // 수량이 10 이상이면 IN, 미만이면 OUT으로 표시
-    return item.quantity >= 10 ? 'IN' : 'OUT';
+  const getItemStatus = (quantity: number): '충분' | '부족' | '없음' => {
+    if (quantity <= 0) return '없음';
+    if (quantity < 10) return '부족';
+    return '충분';
   };
 
   return (
-    <div>
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="flex-1 relative">
-          <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            placeholder="자재명 또는 설명으로 검색"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-          />
-        </div>
-        
-        <div className="w-full md:w-64 relative">
-          <FaFilter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+    <div className="space-y-6">
+      {/* 검색 및 필터링 툴바 */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 gap-4">
+        <div className="flex items-center w-full md:w-auto space-x-2">
+          <div className="relative flex-grow">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="자재명, 코드, 카테고리 검색..."
+              className="w-full md:w-64 pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm"
+            />
+            <span className="absolute left-3 top-2.5 text-gray-400">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </span>
+          </div>
+          
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 appearance-none rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm"
           >
             <option value="">모든 카테고리</option>
-            {categories.map(category => (
-              <option key={category} value={category}>{category}</option>
+            {categories.map((category, index) => (
+              <option key={index} value={category}>{category}</option>
             ))}
           </select>
-          <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-            <svg className="fill-current h-4 w-4 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-              <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-            </svg>
-          </div>
         </div>
+        
+        <button
+          onClick={fetchInventory}
+          className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          새로고침
+        </button>
       </div>
       
+      {/* 자재 목록 표 */}
       {isLoading ? (
-        <div className="flex justify-center py-12">
-          <div className="relative w-16 h-16">
-            <div className="absolute top-0 left-0 w-full h-full border-4 border-blue-100 rounded-full animate-ping opacity-75"></div>
-            <div className="absolute top-0 left-0 w-full h-full border-t-4 border-blue-500 rounded-full animate-spin"></div>
-          </div>
-        </div>
-      ) : filteredItems.length > 0 ? (
-        <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs uppercase bg-gray-50 dark:bg-gray-700">
-              <tr>
-                <th className="px-4 py-3 text-gray-700 dark:text-gray-300">자재명</th>
-                <th className="px-4 py-3 text-gray-700 dark:text-gray-300">구분</th>
-                <th className="px-4 py-3 text-gray-700 dark:text-gray-300">카테고리</th>
-                <th className="px-4 py-3 text-gray-700 dark:text-gray-300">수량</th>
-                <th className="px-4 py-3 text-gray-700 dark:text-gray-300">단가</th>
-                <th className="px-4 py-3 text-gray-700 dark:text-gray-300">총액</th>
-                <th className="px-4 py-3 text-gray-700 dark:text-gray-300 text-center">작업</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {filteredItems.map((item) => (
-                <tr key={item.id} className="bg-white dark:bg-gray-800 hover:bg-blue-50 dark:hover:bg-gray-700 transition duration-150">
-                  <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
-                    {item.name}
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{item.description}</p>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded-md text-xs font-medium ${
-                      getItemType(item) === 'IN' 
-                        ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
-                        : 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400'
-                    }`}>
-                      {getItemType(item)}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
-                    <span className="px-2 py-1 rounded-md bg-gray-100 dark:bg-gray-700 text-xs">
-                      {item.category}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-medium ${
-                      item.quantity <= 5 
-                        ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' 
-                        : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                    }`}>
-                      {item.quantity}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{item.unit_price.toLocaleString()}원</td>
-                  <td className="px-4 py-3 text-gray-900 font-medium dark:text-white">{(item.quantity * item.unit_price).toLocaleString()}원</td>
-                  <td className="px-4 py-3 text-center">
-                    <div className="flex justify-center space-x-2">
-                      <button
-                        onClick={() => handleViewDetail(item.id)}
-                        className="px-2 py-1 text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
-                      >
-                        상세
-                      </button>
-                      <button
-                        onClick={() => handleEdit(item.id)}
-                        className="px-2 py-1 text-xs text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 transition-colors"
-                      >
-                        수정
-                      </button>
-                      <button
-                        onClick={() => openDeleteModal(item.id)}
-                        className="px-2 py-1 text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 transition-colors"
-                      >
-                        삭제
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="flex justify-center items-center py-10">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
         </div>
       ) : (
-        <div className="py-12 text-center bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-          <FaBox className="mx-auto text-gray-300 dark:text-gray-600" size={48} />
-          <p className="mt-4 text-gray-500 dark:text-gray-400">
-            {searchTerm || categoryFilter ? '검색 결과가 없습니다.' : '등록된 자재가 없습니다.'}
-          </p>
-          <button className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
-            자재 추가하기
-          </button>
-        </div>
-      )}
-      
-      {/* 삭제 확인 모달 */}
-      {showDeleteModal && deleteItemId && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md mx-4 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">자재 삭제 확인</h3>
-            
-            <p className="text-gray-700 dark:text-gray-300 mb-6">
-              <span className="font-medium text-red-600 dark:text-red-400">{deleteItemName}</span> 자재를 데이터베이스에서 영구적으로 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.
-            </p>
-            
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => {
-                  setShowDeleteModal(false);
-                  setDeleteItemId(null);
-                }}
-                className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg transition-colors"
-                disabled={isDeleting}
-              >
-                취소
-              </button>
-              <button
-                onClick={() => handleDeleteItem(deleteItemId)}
-                className="px-4 py-2 text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50"
-                disabled={isDeleting}
-              >
-                {isDeleting ? '삭제 중...' : '삭제'}
-              </button>
+        <div className="overflow-x-auto">
+          {filteredItems.length === 0 ? (
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 text-center">
+              <p className="text-gray-500 dark:text-gray-400">자재 목록이 없습니다.</p>
             </div>
-          </div>
+          ) : (
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-800">
+                <tr>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">자재명</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">코드</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">카테고리</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">수량</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">단위</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">단가</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">상태</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">관리</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
+                {filteredItems.map((item) => {
+                  const status = getItemStatus(item.quantity);
+                  let statusColor = '';
+                  
+                  if (status === '충분') statusColor = 'text-green-500 dark:text-green-400';
+                  else if (status === '부족') statusColor = 'text-yellow-500 dark:text-yellow-400';
+                  else if (status === '없음') statusColor = 'text-red-500 dark:text-red-400';
+                  
+                  return (
+                    <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">{item.name}</div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="text-sm text-gray-500 dark:text-gray-400">{item.code || '-'}</div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="text-sm text-gray-500 dark:text-gray-400">{item.category || '-'}</div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="text-sm text-gray-500 dark:text-gray-400">{item.quantity}</div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="text-sm text-gray-500 dark:text-gray-400">{item.unit || '-'}</div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                          {item.unit_price ? `${item.unit_price.toLocaleString()}원` : '-'}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className={`inline-block px-2 py-1 text-xs font-semibold rounded-full ${statusColor}`}>
+                          {status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
+                        <div className="flex justify-center space-x-2">
+                          <button
+                            onClick={() => onViewDetail(item.id)}
+                            className="px-2 py-1 text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                          >
+                            상세
+                          </button>
+                          <button
+                            onClick={() => onEdit(item.id)}
+                            className="px-2 py-1 text-xs text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 transition-colors"
+                          >
+                            수정
+                          </button>
+                          <button
+                            onClick={() => onDelete(item.id, item.name)}
+                            className="px-2 py-1 text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 transition-colors"
+                          >
+                            삭제
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
     </div>
@@ -961,12 +1169,12 @@ function ItemDetailModal({ itemId, onClose }: { itemId: string; onClose: () => v
                   <p className="font-medium text-gray-900 dark:text-white">{item.quantity}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">단가</p>
-                  <p className="font-medium text-gray-900 dark:text-white">{item.unit_price.toLocaleString()}원</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">단위</p>
+                  <p className="font-medium text-gray-900 dark:text-white">{item.unit}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">총액</p>
-                  <p className="font-medium text-gray-900 dark:text-white">{(item.quantity * item.unit_price).toLocaleString()}원</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">총 수량</p>
+                  <p className="font-medium text-gray-900 dark:text-white">{item.quantity}</p>
                 </div>
               </div>
               
@@ -1024,118 +1232,203 @@ function ItemEditModal({
   onClose: () => void;
   onUpdate: (item: InventoryItem) => void;
 }) {
-  const [item, setItem] = useState<InventoryItem | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<Partial<InventoryItem> & { type: string }>({
     name: '',
     description: '',
     category: '',
     quantity: 0,
-    unit_price: 0,
+    unit: '',
     type: 'IN',
   });
+  const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [units, setUnits] = useState<{id: string, name: string, symbol: string}[]>([]);
   
-  // 자재 유형 결정 (임시 로직에서 수정)
+  // 자재 타입 판별 (물품 수량으로 구분)
   const getItemType = (item: InventoryItem) => {
-    // 실제로는 데이터베이스에서 구분 정보를 가져와야 함
-    // 여기서는 단순히 수량이 10 이상이면 IN, 미만이면 OUT으로 표시
     return item.quantity >= 10 ? 'IN' : 'OUT';
   };
   
   useEffect(() => {
-    const fetchItemDetails = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('inventory')
-          .select('*')
-          .eq('id', itemId)
-          .single();
-          
-        if (error) throw error;
-        setItem(data);
+    fetchItemDetails();
+    fetchUnits();
+  }, [itemId]);
+
+  const fetchUnits = async () => {
+    try {
+      console.log('단위 목록 조회 시작 (수정 모달)');
+      const { data, error } = await supabase
+        .from('units')
+        .select('id, name, symbol')
+        .order('name');
+
+      if (error) {
+        console.error('단위 목록 조회 오류:', error);
+        if (error.code === '42P01') { // 테이블이 존재하지 않는 경우
+          createUnitsTableIfNotExists();
+          return;
+        }
+        
+        if (error.message?.includes('not exist') || error.message?.includes('undefined')) {
+          createUnitsTableIfNotExists();
+          return;
+        }
+        
+        throw error;
+      }
+
+      console.log('단위 목록 조회 결과:', data?.length || 0);
+      
+      if (!data || data.length === 0) {
+        // 테이블은 있지만 데이터가 없는 경우
+        console.warn('단위 테이블에 데이터가 없습니다. 샘플 데이터를 추가하세요.');
+        createUnitsTableIfNotExists();
+        return;
+      }
+
+      setUnits(data);
+    } catch (error) {
+      console.error('단위 목록 로딩 중 예상치 못한 오류:', error);
+      setError('단위 목록을 불러오는 중 오류가 발생했습니다. 페이지를 새로고침하거나 관리자에게 문의하세요.');
+    }
+  };
+  
+  const createUnitsTableIfNotExists = () => {
+    const sqlCommand = `
+-- units 테이블 생성
+CREATE TABLE IF NOT EXISTS units (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name VARCHAR NOT NULL,
+  symbol VARCHAR NOT NULL,
+  description TEXT,
+  category VARCHAR,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- units 테이블에 기본 데이터 입력
+INSERT INTO units (name, symbol, description, category) VALUES
+('미터', 'm', '길이의 SI 기본 단위', '길이'),
+('센티미터', 'cm', '미터의 1/100', '길이'),
+('밀리미터', 'mm', '미터의 1/1000', '길이'),
+('킬로그램', 'kg', '질량의 SI 기본 단위', '질량'),
+('그램', 'g', '킬로그램의 1/1000', '질량'),
+('리터', 'L', '부피의 단위', '부피'),
+('밀리리터', 'mL', '리터의 1/1000', '부피'),
+('제곱미터', 'm²', '면적의 단위', '면적'),
+('개', 'ea', '개수 단위', '수량'),
+('팩', 'pack', '묶음 단위', '수량'),
+('상자', 'box', '상자 단위', '수량'),
+('세트', 'set', '세트 단위', '수량')
+ON CONFLICT (id) DO NOTHING;
+`;
+
+    const message = `
+단위 테이블이 존재하지 않거나 데이터가 비어 있습니다.
+
+Supabase의 SQL 에디터에서 다음 명령을 실행한 후, 페이지를 새로고침 하세요:
+
+${sqlCommand}
+
+또는 관리자에게 문의하여 단위 테이블을 설정해달라고 요청하세요.
+`;
+
+    alert(message);
+    console.warn('단위 테이블 문제 감지됨');
+  };
+  
+  // 자재 상세 정보 로드
+  const fetchItemDetails = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('inventory')
+        .select('*')
+        .eq('id', itemId)
+        .single();
+        
+      if (error) throw error;
+      
+      if (data) {
         setFormData({
+          id: data.id,
           name: data.name,
-          description: data.description || '',
+          description: data.description,
           category: data.category,
           quantity: data.quantity,
-          unit_price: data.unit_price,
+          unit: data.unit,
           type: getItemType(data),
         });
-      } catch (error) {
-        console.error('자재 상세 정보 로딩 오류:', error);
-      } finally {
-        setLoading(false);
       }
-    };
-    
-    fetchItemDetails();
-  }, [itemId]);
+    } catch (error) {
+      console.error('자재 상세 정보 로딩 오류:', error);
+      setError('자재 정보를 불러오는데 실패했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
   
+  // 입력 필드 변경 처리
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData({
       ...formData,
-      [name]: name === 'quantity' || name === 'unit_price' ? parseFloat(value) : value,
+      [name]: name === 'quantity' ? parseFloat(value) : value,
     });
   };
   
+  // 수정 폼 제출 처리
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setSaving(true);
+    setUpdating(true);
     
     try {
-      if (!item) throw new Error('자재 정보를 찾을 수 없습니다.');
+      if (!formData.id) throw new Error('자재 정보를 찾을 수 없습니다.');
       
       // 구분이 OUT이고 수량이 10 이상이면 자동으로 IN으로 변경
       // 구분이 IN이고 수량이 10 미만이면 자동으로 OUT으로 변경
-      let updatedQuantity = formData.quantity;
+      let updatedType = formData.type;
+      let updatedQuantity = formData.quantity || 0;
+      
       if (formData.type === 'OUT' && updatedQuantity >= 10) {
-        updatedQuantity = 9; // OUT이면 수량을 9 이하로 조정
+        updatedType = 'IN';
       } else if (formData.type === 'IN' && updatedQuantity < 10) {
-        updatedQuantity = 10; // IN이면 수량을 10 이상으로 조정
+        updatedType = 'OUT';
       }
       
-      const updatedItem = {
-        ...item,
-        name: formData.name,
-        description: formData.description,
-        category: formData.category,
+      // 업데이트할 객체 생성 (type은 DB에 저장하지 않음)
+      const { type, ...itemToUpdate } = {
+        ...formData,
         quantity: updatedQuantity,
-        unit_price: formData.unit_price,
         updated_at: new Date().toISOString(),
       };
       
       const { error } = await supabase
         .from('inventory')
-        .update(updatedItem)
-        .eq('id', item.id);
-        
+        .update(itemToUpdate as InventoryItem)
+        .eq('id', formData.id);
+      
       if (error) throw error;
       
-      console.log('자재 수정 성공:', updatedItem);
-      
-      // 업데이트된 정보 다시 가져오기
-      const { data: refreshedData, error: refreshError } = await supabase
+      // 업데이트된 데이터 가져오기
+      const { data, error: fetchError } = await supabase
         .from('inventory')
         .select('*')
-        .eq('id', item.id)
+        .eq('id', formData.id)
         .single();
-        
-      if (refreshError) {
-        console.warn('업데이트된 자재 정보를 다시 불러오는데 실패했습니다:', refreshError);
-        onUpdate(updatedItem); // 기존 객체로 업데이트
-      } else {
-        console.log('최신 자재 정보 조회 성공:', refreshedData);
-        onUpdate(refreshedData); // 최신 데이터로 업데이트
+      
+      if (fetchError) throw fetchError;
+      
+      if (data) {
+        // 부모 컴포넌트에 업데이트된 아이템 전달
+        onUpdate(data);
       }
     } catch (error: any) {
       console.error('자재 수정 오류:', error);
       setError(error.message || '자재 정보 수정 중 오류가 발생했습니다.');
     } finally {
-      setSaving(false);
+      setUpdating(false);
     }
   };
   
@@ -1156,7 +1449,7 @@ function ItemEditModal({
             <div className="flex justify-center py-6">
               <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
             </div>
-          ) : item ? (
+          ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
                 <div className="bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 p-3 rounded-lg text-sm">
@@ -1187,7 +1480,7 @@ function ItemEditModal({
                   <select
                     id="type"
                     name="type"
-                    value={formData.type}
+                    value={formData.type || 'IN'}
                     onChange={handleChange}
                     className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 text-gray-900 dark:text-white"
                   >
@@ -1247,20 +1540,24 @@ function ItemEditModal({
                 </div>
                 
                 <div>
-                  <label htmlFor="unit_price" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    단가
+                  <label htmlFor="unit" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    단위
                   </label>
-                  <input
-                    type="number"
-                    id="unit_price"
-                    name="unit_price"
-                    value={formData.unit_price}
+                  <select
+                    id="unit"
+                    name="unit"
+                    value={formData.unit || ''}
                     onChange={handleChange}
-                    min="0"
-                    step="0.01"
                     className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 text-gray-900 dark:text-white"
                     required
-                  />
+                  >
+                    <option value="">단위 선택</option>
+                    {units.map((unit) => (
+                      <option key={unit.id} value={unit.symbol}>
+                        {unit.name} ({unit.symbol})
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
               
@@ -1269,21 +1566,19 @@ function ItemEditModal({
                   type="button"
                   onClick={onClose}
                   className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg transition-colors"
-                  disabled={saving}
+                  disabled={updating}
                 >
                   취소
                 </button>
                 <button
                   type="submit"
                   className="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50"
-                  disabled={saving}
+                  disabled={updating}
                 >
-                  {saving ? '저장 중...' : '저장'}
+                  {updating ? '저장 중...' : '저장'}
                 </button>
               </div>
             </form>
-          ) : (
-            <p className="text-center text-gray-500 dark:text-gray-400">자재 정보를 찾을 수 없습니다.</p>
           )}
         </div>
       </div>

@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { FaBox, FaShoppingCart, FaIndustry, FaTruck, FaCog, FaTools, FaChartLine, FaBars, FaTimes } from 'react-icons/fa';
 
 const menuItems = [
+  { name: '대시보드', path: '/dashboard', icon: <FaChartLine size={20} /> },
   { name: '자재관리', path: '/dashboard/inventory', icon: <FaBox size={20} /> },
   { name: '구매관리', path: '/dashboard/purchase', icon: <FaShoppingCart size={20} /> },
   { name: '생산관리', path: '/dashboard/production', icon: <FaIndustry size={20} /> },

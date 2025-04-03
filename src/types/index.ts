@@ -11,7 +11,7 @@ export interface InventoryItem {
   name: string;
   description: string;
   quantity: number;
-  unit_price: number;
+  unit: string;
   category: string;
   created_at: string;
   updated_at: string;
@@ -120,6 +120,10 @@ export interface Vendor {
   user_id?: string;
   created_at?: string;
   updated_at?: string;
+  product_name: string;
+  unit_price: number;
+  phone_number?: string;
+  updated_price?: number;
 }
 
 export interface ProductModel {

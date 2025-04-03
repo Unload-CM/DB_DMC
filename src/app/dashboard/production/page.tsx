@@ -156,11 +156,31 @@ function ProductionPlanTab({ onRefresh }: { onRefresh: () => void }) {
 
   const fetchInventory = async () => {
     try {
+      // 자재 테이블에서 자재 목록 로드
       const { data, error } = await supabase
-        .from('inventory_items')
+        .from('inventory')
         .select('*');
           
-      if (error) throw error;
+      if (error) {
+        if (error.message.includes('does not exist')) {
+          console.warn('자재 테이블이 존재하지 않습니다. inventory_items 테이블 대신 inventory 테이블을 사용합니다.');
+          // 테이블 이름이 다를 수 있으므로 대체 이름으로 시도
+          const { data: altData, error: altError } = await supabase
+            .from('inventory_items')
+            .select('*');
+            
+          if (altError) {
+            console.error('대체 자재 테이블 로딩 오류:', altError);
+            throw altError;
+          }
+          
+          setInventory(altData || []);
+          return;
+        }
+        throw error;
+      }
+      
+      console.log('자재 목록 로드됨:', data?.length || 0, '개 항목');
       setInventory(data || []);
     } catch (error: any) {
       console.error('재고 목록 로딩 오류:', error.message || error);
@@ -181,14 +201,22 @@ function ProductionPlanTab({ onRefresh }: { onRefresh: () => void }) {
   };
 
   const getMaterialStatus = (materialType: string) => {
-    // 해당 원자재 유형의 재고 항목을 찾아 상태 확인
-    const materialItems = inventory.filter(item => 
-      item.category && item.category.toLowerCase() === materialType.toLowerCase()
+    // '원자재' 카테고리로 필터링
+    const rawMaterials = inventory.filter(item => 
+      item.category && item.category.toLowerCase() === '원자재'
     );
     
-    if (materialItems.length === 0) return 'unavailable';
+    console.log('원자재 항목:', rawMaterials.length, '개 발견');
     
-    const totalQuantity = materialItems.reduce((sum, item) => sum + item.quantity, 0);
+    if (rawMaterials.length === 0) {
+      console.warn('원자재 카테고리 항목이 없습니다.');
+      return 'unavailable';
+    }
+    
+    // 원자재 총 수량 계산
+    const totalQuantity = rawMaterials.reduce((sum, item) => sum + (item.quantity || 0), 0);
+    console.log('원자재 총 수량:', totalQuantity);
+    
     if (totalQuantity >= 100) return 'sufficient';
     if (totalQuantity > 0) return 'insufficient';
     return 'unavailable';
@@ -516,6 +544,32 @@ function ProductionPlanTab({ onRefresh }: { onRefresh: () => void }) {
                    newPlan.material_status === 'insufficient' ? '부족' : 
                    '없음'}
                 </div>
+                
+                {/* 원자재 정보 표시 */}
+                <div className="mt-2 p-2 bg-gray-50 dark:bg-gray-700 rounded-md text-sm">
+                  <h4 className="font-medium mb-1">원자재 정보</h4>
+                  {inventory.filter(item => 
+                    item.category && item.category.toLowerCase() === '원자재'
+                  ).length > 0 ? (
+                    <div className="space-y-1">
+                      {inventory.filter(item => 
+                        item.category && item.category.toLowerCase() === '원자재'
+                      ).map(item => (
+                        <div key={item.id} className="flex justify-between items-center">
+                          <span>{item.name}</span>
+                          <span className={item.quantity > 10 ? 'text-green-600' : 'text-yellow-600'}>
+                            {item.quantity} {item.unit}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 dark:text-gray-400 italic">
+                      '원자재' 카테고리로 등록된 자재가 없습니다. 
+                      자재관리에서 원자재 항목을 추가해주세요.
+                    </p>
+                  )}
+                </div>
               </div>
               
               <div className="mb-4">
@@ -687,6 +741,24 @@ function ProductionPerformanceTab({ onRefresh }: { onRefresh: () => void }) {
       // 소요일 계산
       const daysRequired = calculateDaysRequired(newPerformance.start_date, newPerformance.end_date);
       
+      // 생산 계획 존재 여부 확인
+      if (newPerformance.plan_id) {
+        const { data: planData, error: planError } = await supabase
+          .from('production_plans')
+          .select('id')
+          .eq('id', newPerformance.plan_id)
+          .single();
+        
+        if (planError) {
+          console.error('생산 계획 조회 오류:', planError);
+          throw new Error('연결된 생산 계획을 찾을 수 없습니다. 유효한 생산 계획을 선택해주세요.');
+        }
+        
+        if (!planData) {
+          throw new Error('선택한 생산 계획이 존재하지 않습니다. 다른 계획을 선택해주세요.');
+        }
+      }
+      
       const { data, error } = await supabase
         .from('production_performances')
         .insert([
@@ -738,7 +810,7 @@ function ProductionPerformanceTab({ onRefresh }: { onRefresh: () => void }) {
       
     } catch (error: any) {
       console.error('생산 실적 추가 오류:', error.message || error);
-      alert('생산 실적 추가 중 오류가 발생했습니다.');
+      alert(`생산 실적 추가 오류: ${error.message || error}`);
     } finally {
       setIsLoading(false);
     }

@@ -105,7 +105,7 @@ function PurchaseRequestTab({ onRefresh }: { onRefresh: () => void }) {
   const [newRequest, setNewRequest] = useState<Partial<PurchaseRequest>>({
     title: '',
     description: '',
-    quantity: 0,
+    quantity: 1,  // 기본값을 0에서 1로 변경
     vendor: '',
     unit_price: 0,
     status: 'pending'
@@ -221,11 +221,18 @@ function PurchaseRequestTab({ onRefresh }: { onRefresh: () => void }) {
         return;
       }
       
+      // NaN 값 방지를 위한 안전한 수치 변환
+      const safeRequest = {
+        ...newRequest,
+        quantity: isNaN(Number(newRequest.quantity)) ? 1 : Number(newRequest.quantity),
+        unit_price: isNaN(Number(newRequest.unit_price)) ? 0 : Number(newRequest.unit_price)
+      };
+      
       const { data, error } = await supabase
         .from('purchase_requests')
         .insert([
           {
-            ...newRequest,
+            ...safeRequest,
             user_id: userId,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
@@ -242,7 +249,7 @@ function PurchaseRequestTab({ onRefresh }: { onRefresh: () => void }) {
       setNewRequest({
         title: '',
         description: '',
-        quantity: 0,
+        quantity: 1,
         vendor: '',
         unit_price: 0,
         status: 'pending'
@@ -353,10 +360,16 @@ function PurchaseRequestTab({ onRefresh }: { onRefresh: () => void }) {
               {filteredRequests.map((request) => (
                 <tr key={request.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
                   <td className="px-4 py-3">{request.title}</td>
-                  <td className="px-4 py-3">{request.quantity}</td>
+                  <td className="px-4 py-3">{isNaN(request.quantity) ? 0 : request.quantity}</td>
                   <td className="px-4 py-3">{request.vendor}</td>
-                  <td className="px-4 py-3">{request.unit_price?.toLocaleString()}원</td>
-                  <td className="px-4 py-3">{(request.quantity * request.unit_price)?.toLocaleString()}원</td>
+                  <td className="px-4 py-3">{isNaN(request.unit_price) ? 0 : request.unit_price?.toLocaleString()}원</td>
+                  <td className="px-4 py-3">{
+                    (() => {
+                      const qty = isNaN(request.quantity) ? 0 : request.quantity;
+                      const price = isNaN(request.unit_price) ? 0 : request.unit_price;
+                      return (qty * price).toLocaleString();
+                    })()
+                  }원</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                       request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
@@ -453,8 +466,11 @@ function PurchaseRequestTab({ onRefresh }: { onRefresh: () => void }) {
                   type="number"
                   required
                   min="1"
-                  value={newRequest.quantity}
-                  onChange={(e) => setNewRequest({...newRequest, quantity: parseInt(e.target.value)})}
+                  value={newRequest.quantity === undefined || isNaN(Number(newRequest.quantity)) ? '' : newRequest.quantity}
+                  onChange={(e) => {
+                    const value = e.target.value === '' ? undefined : parseInt(e.target.value);
+                    setNewRequest({...newRequest, quantity: isNaN(Number(value)) ? 1 : value});
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                 />
               </div>
@@ -476,8 +492,11 @@ function PurchaseRequestTab({ onRefresh }: { onRefresh: () => void }) {
                   type="number"
                   required
                   min="0"
-                  value={newRequest.unit_price}
-                  onChange={(e) => setNewRequest({...newRequest, unit_price: parseInt(e.target.value)})}
+                  value={newRequest.unit_price === undefined || isNaN(Number(newRequest.unit_price)) ? '' : newRequest.unit_price}
+                  onChange={(e) => {
+                    const value = e.target.value === '' ? undefined : parseInt(e.target.value);
+                    setNewRequest({...newRequest, unit_price: isNaN(Number(value)) ? 0 : value});
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                 />
               </div>
@@ -1391,8 +1410,11 @@ function VendorTab({ onRefresh }: { onRefresh: () => void }) {
                   type="number"
                   required
                   min="0"
-                  value={newVendor.unit_price || 0}
-                  onChange={(e) => setNewVendor({...newVendor, unit_price: parseInt(e.target.value)})}
+                  value={newVendor.unit_price === undefined || isNaN(Number(newVendor.unit_price)) ? '' : newVendor.unit_price}
+                  onChange={(e) => {
+                    const value = e.target.value === '' ? undefined : parseInt(e.target.value);
+                    setNewVendor({...newVendor, unit_price: isNaN(Number(value)) ? 0 : value});
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                 />
               </div>
@@ -1509,8 +1531,11 @@ function VendorTab({ onRefresh }: { onRefresh: () => void }) {
                   type="number"
                   required
                   min="0"
-                  value={selectedVendor.unit_price}
-                  onChange={(e) => setSelectedVendor({...selectedVendor, unit_price: parseInt(e.target.value)})}
+                  value={selectedVendor.unit_price === undefined || isNaN(Number(selectedVendor.unit_price)) ? '' : selectedVendor.unit_price}
+                  onChange={(e) => {
+                    const value = e.target.value === '' ? 0 : parseInt(e.target.value);
+                    setSelectedVendor({...selectedVendor, unit_price: isNaN(Number(value)) ? 0 : value});
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                 />
               </div>
@@ -1520,11 +1545,14 @@ function VendorTab({ onRefresh }: { onRefresh: () => void }) {
                 <input
                   type="number"
                   min="0"
-                  value={selectedVendor.updated_price || ''}
-                  onChange={(e) => setSelectedVendor({
-                    ...selectedVendor, 
-                    updated_price: e.target.value ? parseInt(e.target.value) : undefined
-                  })}
+                  value={selectedVendor.updated_price === undefined || isNaN(Number(selectedVendor.updated_price)) ? '' : selectedVendor.updated_price}
+                  onChange={(e) => {
+                    const value = e.target.value === '' ? undefined : parseInt(e.target.value);
+                    setSelectedVendor({
+                      ...selectedVendor, 
+                      updated_price: isNaN(Number(value)) ? undefined : value
+                    });
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                 />
                 <p className="text-xs text-gray-500 mt-1">입력 시 이 단가로 업데이트됩니다</p>
