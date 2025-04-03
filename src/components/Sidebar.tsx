@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { FaBox, FaShoppingCart, FaIndustry, FaTruck, FaCog, FaTools, FaChartLine, FaBars, FaTimes } from 'react-icons/fa';
+import { usePathname, useRouter } from 'next/navigation';
+import { FaBox, FaShoppingCart, FaIndustry, FaTruck, FaCog, FaTools, FaChartLine, FaBars, FaTimes, FaSignOutAlt } from 'react-icons/fa';
+import { supabase } from '@/lib/supabase';
 
 const menuItems = [
   { name: '대시보드', path: '/dashboard', icon: <FaChartLine size={20} /> },
@@ -17,6 +18,7 @@ const menuItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -34,6 +36,16 @@ export default function Sidebar() {
   const handleMobileMenuItemClick = () => {
     if (window.innerWidth < 768) {
       setIsMobileMenuOpen(false);
+    }
+  };
+
+  // 로그아웃 처리
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      router.push('/auth/login');
+    } catch (error) {
+      console.error('로그아웃 중 오류 발생:', error);
     }
   };
 
@@ -129,19 +141,32 @@ export default function Sidebar() {
         </nav>
 
         {/* 사용자 프로필 섹션 */}
-        {isOpen && (
-          <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-blue-700">
-            <div className="flex items-center">
-              <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center">
-                <span className="font-bold text-lg">A</span>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium">관리자</p>
-                <p className="text-xs text-blue-300">admin@example.com</p>
+        <div className="absolute bottom-0 left-0 right-0 border-t border-blue-700">
+          {/* 로그아웃 버튼 */}
+          <button
+            onClick={handleLogout}
+            className={`w-full p-4 flex items-center text-blue-200 hover:bg-blue-700/60 transition-colors
+              ${!isOpen && 'justify-center'}`}
+          >
+            <FaSignOutAlt size={20} />
+            {isOpen && <span className="ml-3">로그아웃</span>}
+          </button>
+
+          {/* 프로필 정보 */}
+          {isOpen && (
+            <div className="p-4 border-t border-blue-700">
+              <div className="flex items-center">
+                <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center">
+                  <span className="font-bold text-lg">A</span>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm font-medium">관리자</p>
+                  <p className="text-xs text-blue-300">admin@example.com</p>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </>
   );
