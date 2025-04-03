@@ -48,291 +48,287 @@ export default function Dashboard() {
     }
     
     setGreetingMessage(greeting);
-
     // 대시보드 데이터 로딩 함수 호출
     fetchDashboardData();
   }, [t]);
 
-  useEffect(() => {
-    async function fetchDashboardData() {
-      setIsLoading(true);
+  // 대시보드 데이터 로딩 함수 정의
+  async function fetchDashboardData() {
+    setIsLoading(true);
 
+    try {
+      console.log('대시보드 데이터 로딩 시작...');
+      
+      // 재고 상태 요약 조회 - 모든 데이터 정확히 가져오기
+      let inventoryCount = 0;
+      let lowStockCount = 0;
+      
       try {
-        console.log('대시보드 데이터 로딩 시작...');
-        
-        // 재고 상태 요약 조회 - 모든 데이터 정확히 가져오기
-        let inventoryCount = 0;
-        let lowStockCount = 0;
-        
-        try {
-          // 기본 테이블에서 먼저 조회
-          const { count, error } = await supabase
-            .from('inventory')
-            .select('*', { count: 'exact' });
-            
-          if (error) {
-            if (error.code === 'PGRST116') { // 테이블이 존재하지 않는 경우
-              console.log('inventory 테이블이 없어 inventory_items 테이블에서 조회합니다.');
-              const { count: altCount, error: altError } = await supabase
-                .from('inventory_items')
-                .select('*', { count: 'exact' });
-                
-              if (!altError) {
-                inventoryCount = altCount || 0;
-              } else {
-                console.error('대체 테이블 조회 오류:', altError);
-              }
-            } else {
-              console.error('재고 카운트 조회 오류:', error);
-            }
-          } else {
-            inventoryCount = count || 0;
-          }
+        // 기본 테이블에서 먼저 조회
+        const { count, error } = await supabase
+          .from('inventory')
+          .select('*', { count: 'exact' });
           
-          // 부족 재고 항목 조회
-          const { data: lowStockItems, error: lowStockError } = await supabase
-            .from('inventory')
-            .select('*')
-            .lt('quantity', 10);
-
-          if (lowStockError) {
-            if (lowStockError.code === 'PGRST116') {
-              const { data: altLowStockItems, error: altLowStockError } = await supabase
-                .from('inventory_items')
-                .select('*')
-                .lt('quantity', 10);
-                
-              if (!altLowStockError) {
-                lowStockCount = altLowStockItems?.length || 0;
-              }
+        if (error) {
+          if (error.code === 'PGRST116') { // 테이블이 존재하지 않는 경우
+            console.log('inventory 테이블이 없어 inventory_items 테이블에서 조회합니다.');
+            const { count: altCount, error: altError } = await supabase
+              .from('inventory_items')
+              .select('*', { count: 'exact' });
+              
+            if (!altError) {
+              inventoryCount = altCount || 0;
+            } else {
+              console.error('대체 테이블 조회 오류:', altError);
             }
           } else {
-            lowStockCount = lowStockItems?.length || 0;
+            console.error('재고 카운트 조회 오류:', error);
           }
+        } else {
+          inventoryCount = count || 0;
+        }
+        
+        // 부족 재고 항목 조회
+        const { data: lowStockItems, error: lowStockError } = await supabase
+          .from('inventory')
+          .select('*')
+          .lt('quantity', 10);
 
-          // 이전 날짜의 재고 데이터 조회 (일주일 전)
+        if (lowStockError) {
+          if (lowStockError.code === 'PGRST116') {
+            const { data: altLowStockItems, error: altLowStockError } = await supabase
+              .from('inventory_items')
+              .select('*')
+              .lt('quantity', 10);
+              
+            if (!altLowStockError) {
+              lowStockCount = altLowStockItems?.length || 0;
+            }
+          }
+        } else {
+          lowStockCount = lowStockItems?.length || 0;
+        }
+
+        // 이전 날짜의 재고 데이터 조회 (일주일 전)
+        const lastWeek = new Date();
+        lastWeek.setDate(lastWeek.getDate() - 7);
+        const lastWeekStr = lastWeek.toISOString().split('T')[0];
+
+        // 일주일 전 재고 수량 통계 조회
+        const { data: historicalInventory } = await supabase
+          .from('inventory_history')
+          .select('total_count')
+          .eq('date', lastWeekStr)
+          .single();
+
+        if (historicalInventory) {
+          const prevCount = historicalInventory.total_count || 0;
+          const growth = prevCount > 0 ? ((inventoryCount - prevCount) / prevCount) * 100 : 0;
+          setInventoryGrowth(parseFloat(growth.toFixed(1)));
+        } else {
+          // 히스토리 없는 경우 랜덤 증감률 (실제 구현시 삭제)
+          setInventoryGrowth(Math.floor(Math.random() * 10) - 2);
+        }
+
+        // 부족 재고 증감률 (히스토리 테이블 없는 경우 랜덤값)
+        setLowStockGrowth(Math.floor(Math.random() * 6) - 3);
+      } catch (inventoryError) {
+        console.error('재고 정보 조회 중 오류:', inventoryError);
+      }
+
+      setInventorySummary({
+        count: inventoryCount,
+        lowStock: lowStockCount
+      });
+
+      // 카테고리별 재고 항목 수 조회
+      try {
+        const { data: inventoryItems, error: categoryError } = await supabase
+          .from('inventory')
+          .select('category, quantity');
+          
+        if (!categoryError && inventoryItems) {
+          const categoryCount: Record<string, {count: number, quantity: number}> = {};
+          inventoryItems.forEach(item => {
+            if (item.category) {
+              if (!categoryCount[item.category]) {
+                categoryCount[item.category] = {count: 0, quantity: 0};
+              }
+              categoryCount[item.category].count += 1;
+              categoryCount[item.category].quantity += (item.quantity || 0);
+            }
+          });
+          
+          const categoryData = Object.entries(categoryCount)
+            .map(([category, data]) => ({ 
+              category, 
+              count: data.count,
+              quantity: data.quantity
+            }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 5);
+            
+          setInventoryCategories(categoryData);
+        }
+      } catch (categoryError) {
+        console.error('카테고리 정보 조회 중 오류:', categoryError);
+      }
+
+      // 최근 구매 요청 조회 및 증감률 계산
+      try {
+        const { data: recentPurchaseRequests, error: purchaseError } = await supabase
+          .from('purchase_request')
+          .select('*, purchase_request_items(*)')
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        if (!purchaseError) {
+          setPurchaseRequests(recentPurchaseRequests || []);
+          
+          // 구매 요청 증감률 계산
+          const today = new Date();
+          const lastWeek = new Date(today);
+          lastWeek.setDate(today.getDate() - 7);
+          
+          const { count: currentWeekCount } = await supabase
+            .from('purchase_request')
+            .select('*', { count: 'exact' })
+            .gte('created_at', today.toISOString().split('T')[0]);
+            
+          const { count: lastWeekCount } = await supabase
+            .from('purchase_request')
+            .select('*', { count: 'exact' })
+            .gte('created_at', lastWeek.toISOString().split('T')[0])
+            .lt('created_at', today.toISOString().split('T')[0]);
+            
+          // null 체크 및 안전한 계산  
+          const currentCount = currentWeekCount || 0;
+          const previousCount = lastWeekCount || 1; // 0으로 나누기 방지
+          
+          if (previousCount > 0) {
+            const growth = ((currentCount - previousCount) / previousCount) * 100;
+            setPurchaseGrowth(parseFloat(growth.toFixed(1)));
+          } else {
+            setPurchaseGrowth(3.8); // 기본값
+          }
+        }
+      } catch (purchaseError) {
+        console.error('구매 요청 조회 중 오류:', purchaseError);
+      }
+
+      // 진행 중인 생산 계획 조회 및 증감률 계산
+      try {
+        const { data: ongoingProductionPlans, error: productionError } = await supabase
+          .from('production_plans')
+          .select('*')
+          .eq('status', 'in_progress')
+          .order('start_date', { ascending: true })
+          .limit(3);
+
+        if (!productionError) {
+          setProductionPlans(ongoingProductionPlans || []);
+          
+          // 생산계획 증감률 계산 (현재 진행중 vs 지난주 진행중)
+          const { count: currentProductionCount } = await supabase
+            .from('production_plans')
+            .select('*', { count: 'exact' })
+            .eq('status', 'in_progress');
+            
           const lastWeek = new Date();
           lastWeek.setDate(lastWeek.getDate() - 7);
-          const lastWeekStr = lastWeek.toISOString().split('T')[0];
-
-          // 일주일 전 재고 수량 통계 조회
-          const { data: historicalInventory } = await supabase
-            .from('inventory_history')
-            .select('total_count')
-            .eq('date', lastWeekStr)
-            .single();
-
-          if (historicalInventory) {
-            const prevCount = historicalInventory.total_count || 0;
-            const growth = prevCount > 0 ? ((inventoryCount - prevCount) / prevCount) * 100 : 0;
-            setInventoryGrowth(parseFloat(growth.toFixed(1)));
+          
+          const { data: completedLastWeek } = await supabase
+            .from('production_plans')
+            .select('*', { count: 'exact' })
+            .eq('status', 'completed')
+            .gte('updated_at', lastWeek.toISOString());
+            
+          const lastWeekProdCount = completedLastWeek?.length || 0;
+          
+          // null 체크 및 안전한 계산
+          const currentCount = currentProductionCount || 0;
+          
+          if (lastWeekProdCount > 0) {
+            const growth = ((currentCount - lastWeekProdCount) / lastWeekProdCount) * 100;
+            setProductionGrowth(parseFloat(growth.toFixed(1)));
           } else {
-            // 히스토리 없는 경우 랜덤 증감률 (실제 구현시 삭제)
-            setInventoryGrowth(Math.floor(Math.random() * 10) - 2);
+            setProductionGrowth(0); // 변화 없음
           }
-
-          // 부족 재고 증감률 (히스토리 테이블 없는 경우 랜덤값)
-          setLowStockGrowth(Math.floor(Math.random() * 6) - 3);
-        } catch (inventoryError) {
-          console.error('재고 정보 조회 중 오류:', inventoryError);
         }
-
-        setInventorySummary({
-          count: inventoryCount,
-          lowStock: lowStockCount
-        });
-
-        // 카테고리별 재고 항목 수 조회
-        try {
-          const { data: inventoryItems, error: categoryError } = await supabase
-            .from('inventory')
-            .select('category, quantity');
-            
-          if (!categoryError && inventoryItems) {
-            const categoryCount: Record<string, {count: number, quantity: number}> = {};
-            inventoryItems.forEach(item => {
-              if (item.category) {
-                if (!categoryCount[item.category]) {
-                  categoryCount[item.category] = {count: 0, quantity: 0};
-                }
-                categoryCount[item.category].count += 1;
-                categoryCount[item.category].quantity += (item.quantity || 0);
-              }
-            });
-            
-            const categoryData = Object.entries(categoryCount)
-              .map(([category, data]) => ({ 
-                category, 
-                count: data.count,
-                quantity: data.quantity
-              }))
-              .sort((a, b) => b.count - a.count)
-              .slice(0, 5);
-              
-            setInventoryCategories(categoryData);
-          }
-        } catch (categoryError) {
-          console.error('카테고리 정보 조회 중 오류:', categoryError);
-        }
-
-        // 최근 구매 요청 조회 및 증감률 계산
-        try {
-          const { data: recentPurchaseRequests, error: purchaseError } = await supabase
-            .from('purchase_request')
-            .select('*, purchase_request_items(*)')
-            .order('created_at', { ascending: false })
-            .limit(5);
-
-          if (!purchaseError) {
-            setPurchaseRequests(recentPurchaseRequests || []);
-            
-            // 구매 요청 증감률 계산
-            const today = new Date();
-            const lastWeek = new Date(today);
-            lastWeek.setDate(today.getDate() - 7);
-            
-            const { count: currentWeekCount } = await supabase
-              .from('purchase_request')
-              .select('*', { count: 'exact' })
-              .gte('created_at', today.toISOString().split('T')[0]);
-              
-            const { count: lastWeekCount } = await supabase
-              .from('purchase_request')
-              .select('*', { count: 'exact' })
-              .gte('created_at', lastWeek.toISOString().split('T')[0])
-              .lt('created_at', today.toISOString().split('T')[0]);
-              
-            // null 체크 및 안전한 계산  
-            const currentCount = currentWeekCount || 0;
-            const previousCount = lastWeekCount || 1; // 0으로 나누기 방지
-            
-            if (previousCount > 0) {
-              const growth = ((currentCount - previousCount) / previousCount) * 100;
-              setPurchaseGrowth(parseFloat(growth.toFixed(1)));
-            } else {
-              setPurchaseGrowth(3.8); // 기본값
-            }
-          }
-        } catch (purchaseError) {
-          console.error('구매 요청 조회 중 오류:', purchaseError);
-        }
-
-        // 진행 중인 생산 계획 조회 및 증감률 계산
-        try {
-          const { data: ongoingProductionPlans, error: productionError } = await supabase
-            .from('production_plans')
-            .select('*')
-            .eq('status', 'in_progress')
-            .order('start_date', { ascending: true })
-            .limit(3);
-
-          if (!productionError) {
-            setProductionPlans(ongoingProductionPlans || []);
-            
-            // 생산계획 증감률 계산 (현재 진행중 vs 지난주 진행중)
-            const { count: currentProductionCount } = await supabase
-              .from('production_plans')
-              .select('*', { count: 'exact' })
-              .eq('status', 'in_progress');
-              
-            const lastWeek = new Date();
-            lastWeek.setDate(lastWeek.getDate() - 7);
-            
-            const { data: completedLastWeek } = await supabase
-              .from('production_plans')
-              .select('*', { count: 'exact' })
-              .eq('status', 'completed')
-              .gte('updated_at', lastWeek.toISOString());
-              
-            const lastWeekProdCount = completedLastWeek?.length || 0;
-            
-            // null 체크 및 안전한 계산
-            const currentCount = currentProductionCount || 0;
-            
-            if (lastWeekProdCount > 0) {
-              const growth = ((currentCount - lastWeekProdCount) / lastWeekProdCount) * 100;
-              setProductionGrowth(parseFloat(growth.toFixed(1)));
-            } else {
-              setProductionGrowth(0); // 변화 없음
-            }
-          }
-        } catch (productionError) {
-          console.error('생산 계획 조회 중 오류:', productionError);
-        }
-
-        // 예정된 출하 계획 조회
-        try {
-          const { data: upcomingShippingPlans, error: shippingError } = await supabase
-            .from('shipping_plan')
-            .select('*')
-            .eq('status', 'planned')
-            .order('shipping_date', { ascending: true })
-            .limit(3);
-
-          if (!shippingError) {
-            setShippingPlans(upcomingShippingPlans || []);
-          }
-        } catch (shippingError) {
-          console.error('출하 계획 조회 중 오류:', shippingError);
-        }
-        
-        // 최근 활동 조회 - 모든 테이블의 최근 변경사항 합산
-        let activityCount = 0;
-        
-        try {
-          // 지난 24시간 내 활동 집계
-          const yesterday = new Date();
-          yesterday.setDate(yesterday.getDate() - 1);
-          const yesterdayIso = yesterday.toISOString();
-          
-          // 재고 활동
-          const { count: inventoryActivityCount } = await supabase
-            .from('inventory')
-            .select('*', { count: 'exact' })
-            .gt('updated_at', yesterdayIso);
-            
-            activityCount += inventoryActivityCount || 0;
-          
-          // 구매 활동
-          const { count: purchaseActivityCount } = await supabase
-            .from('purchase_request')
-            .select('*', { count: 'exact' })
-            .gt('updated_at', yesterdayIso);
-            
-            activityCount += purchaseActivityCount || 0;
-          
-          // 생산 활동
-          const { count: productionActivityCount } = await supabase
-            .from('production_plans')
-            .select('*', { count: 'exact' })
-            .gt('updated_at', yesterdayIso);
-            
-            activityCount += productionActivityCount || 0;
-          
-          // 배송 활동
-          const { count: shippingActivityCount } = await supabase
-            .from('shipping_plan')
-            .select('*', { count: 'exact' })
-            .gt('updated_at', yesterdayIso);
-            
-            activityCount += shippingActivityCount || 0;
-          
-          setRecentActivityCount(activityCount);
-        } catch (activityError) {
-          console.error('최근 활동 조회 중 오류:', activityError);
-          setRecentActivityCount(0);
-        }
-        
-        console.log('대시보드 데이터 로딩 완료');
-      } catch (error) {
-        console.error('대시보드 데이터 로딩 오류:', error);
-      } finally {
-        setIsLoading(false);
+      } catch (productionError) {
+        console.error('생산 계획 조회 중 오류:', productionError);
       }
-    }
 
-    fetchDashboardData();
-  }, [t]);
+      // 예정된 출하 계획 조회
+      try {
+        const { data: upcomingShippingPlans, error: shippingError } = await supabase
+          .from('shipping_plan')
+          .select('*')
+          .eq('status', 'planned')
+          .order('shipping_date', { ascending: true })
+          .limit(3);
+
+        if (!shippingError) {
+          setShippingPlans(upcomingShippingPlans || []);
+        }
+      } catch (shippingError) {
+        console.error('출하 계획 조회 중 오류:', shippingError);
+      }
+      
+      // 최근 활동 조회 - 모든 테이블의 최근 변경사항 합산
+      let activityCount = 0;
+      
+      try {
+        // 지난 24시간 내 활동 집계
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayIso = yesterday.toISOString();
+        
+        // 재고 활동
+        const { count: inventoryActivityCount } = await supabase
+          .from('inventory')
+          .select('*', { count: 'exact' })
+          .gt('updated_at', yesterdayIso);
+          
+        activityCount += inventoryActivityCount || 0;
+        
+        // 구매 활동
+        const { count: purchaseActivityCount } = await supabase
+          .from('purchase_request')
+          .select('*', { count: 'exact' })
+          .gt('updated_at', yesterdayIso);
+          
+        activityCount += purchaseActivityCount || 0;
+        
+        // 생산 활동
+        const { count: productionActivityCount } = await supabase
+          .from('production_plans')
+          .select('*', { count: 'exact' })
+          .gt('updated_at', yesterdayIso);
+          
+        activityCount += productionActivityCount || 0;
+        
+        // 배송 활동
+        const { count: shippingActivityCount } = await supabase
+          .from('shipping_plan')
+          .select('*', { count: 'exact' })
+          .gt('updated_at', yesterdayIso);
+          
+        activityCount += shippingActivityCount || 0;
+        
+        setRecentActivityCount(activityCount);
+      } catch (activityError) {
+        console.error('최근 활동 조회 중 오류:', activityError);
+        setRecentActivityCount(0);
+      }
+      
+      console.log('대시보드 데이터 로딩 완료');
+    } catch (error) {
+      console.error('대시보드 데이터 로딩 오류:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   if (isLoading) {
     return (
@@ -467,62 +463,40 @@ export default function Dashboard() {
   );
 }
 
-function QuickAccessButton({
-  title,
-  icon,
-  href,
-  bgColor = 'bg-gray-50',
-  textColor = 'text-gray-700',
-}: {
-  title: string;
-  icon: React.ReactNode;
-  href: string;
-  bgColor?: string;
-  textColor?: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`${bgColor} ${textColor} rounded-xl p-4 flex flex-col items-center justify-center transition-all hover:shadow-md hover:scale-105 border border-gray-200 dark:border-gray-700`}
-    >
-      <div className="mb-2">{icon}</div>
-      <p className="text-sm font-medium">{title}</p>
-    </Link>
-  );
-}
-
 function DashboardCard({
   title,
   value,
   icon,
-  change,
-  changeType = 'neutral',
-  color = 'blue',
+  trend,
+  link,
+  trendDirection = 'normal',
+  trend_display = '',
 }: {
   title: string;
   value: string;
   icon: React.ReactNode;
-  change: string;
-  changeType: 'up' | 'down' | 'neutral';
-  color?: 'blue' | 'red' | 'green' | 'yellow' | 'purple';
+  trend: number;
+  link?: string;
+  trendDirection?: 'normal' | 'reverse';
+  trend_display?: string;
 }) {
-  const getColorClass = () => {
-    const baseClass = 'rounded-lg p-6 bg-white dark:bg-gray-800 shadow-lg border';
-    switch (color) {
-      case 'red': return `${baseClass} border-red-200 dark:border-red-900`;
-      case 'green': return `${baseClass} border-green-200 dark:border-green-900`;
-      case 'yellow': return `${baseClass} border-yellow-200 dark:border-yellow-900`;
-      case 'purple': return `${baseClass} border-purple-200 dark:border-purple-900`;
-      default: return `${baseClass} border-blue-200 dark:border-blue-900`;
-    }
-  };
-
+  let changeType: 'up' | 'down' | 'neutral' = 'neutral';
+  let trendText = trend ? `${trend.toFixed(1)}%` : '';
+  
+  if (trend > 0) {
+    changeType = trendDirection === 'reverse' ? 'down' : 'up';
+  } else if (trend < 0) {
+    changeType = trendDirection === 'reverse' ? 'up' : 'down';
+  }
+  
+  if (trend_display === 'neutral') {
+    changeType = 'neutral';
+  }
+  
   return (
-    <div className={getColorClass()}>
+    <div className="rounded-lg p-6 bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-700">
       <div className="flex justify-between items-start">
-        <div className="p-3 rounded-lg bg-opacity-10"
-          style={{ backgroundColor: `var(--color-${color}-100)` }}
-        >
+        <div className="p-3 rounded-lg bg-opacity-10 bg-blue-100 dark:bg-blue-900/20">
           {icon}
         </div>
         <div className="flex items-center text-sm">
@@ -536,7 +510,7 @@ function DashboardCard({
               'text-gray-600 dark:text-gray-400'
             }`}
           >
-            {change}
+            {trendText}
           </span>
         </div>
       </div>
@@ -544,33 +518,40 @@ function DashboardCard({
         <p className="text-3xl font-bold text-gray-900 dark:text-white">{value}</p>
         <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{title}</p>
       </div>
+      {link && (
+        <div className="mt-3 text-right">
+          <Link href={link} className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 flex items-center justify-end">
+            상세보기 <FaChevronRight className="ml-1" size={8} />
+          </Link>
+        </div>
+      )}
     </div>
   );
 }
 
-function SectionCard({
-  title,
-  children,
-  icon,
-  link,
-  linkHref,
-}: {
-  title: string;
-  children: React.ReactNode;
+function DashboardPanel({ 
+  title, 
+  children, 
+  icon, 
+  link, 
+  className = "" 
+}: { 
+  title: string; 
+  children: React.ReactNode; 
   icon?: React.ReactNode;
   link?: string;
-  linkHref?: string;
+  className?: string;
 }) {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <div className={`bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden ${className}`}>
       <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center">
           {icon && <span className="mr-3">{icon}</span>}
           <h3 className="text-lg font-medium text-gray-900 dark:text-white">{title}</h3>
         </div>
-        {link && linkHref && (
-          <Link href={linkHref} className="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center">
-            {link} <FaChevronRight className="ml-1" size={12} />
+        {link && (
+          <Link href={link} className="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center">
+            전체보기 <FaChevronRight className="ml-1" size={12} />
           </Link>
         )}
       </div>
@@ -582,7 +563,7 @@ function SectionCard({
 }
 
 function getStatusColor(status: string) {
-  switch (status.toLowerCase()) {
+  switch (status?.toLowerCase()) {
     case 'completed':
     case 'approved':
       return 'text-green-600 dark:text-green-400';
@@ -599,15 +580,19 @@ function getStatusColor(status: string) {
 }
 
 function formatDate(dateString: string) {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('ko-KR', { 
-    year: 'numeric', 
-    month: 'short', 
-    day: 'numeric' 
-  });
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('ko-KR', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    });
+  } catch (e) {
+    return '날짜 정보 없음';
+  }
 }
 
-// 카테고리별 재고 차트 컴포넌트 개선
+// 카테고리별 재고 차트 컴포넌트
 interface InventoryCategoryChartProps {
   inventoryCategories: Array<{category: string, count: number, quantity: number}>;
 }
@@ -615,7 +600,7 @@ interface InventoryCategoryChartProps {
 const InventoryCategoryChart = ({ inventoryCategories }: InventoryCategoryChartProps) => {
   const { t } = useTranslation('common');
 
-  if (inventoryCategories.length === 0) {
+  if (!inventoryCategories || inventoryCategories.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-60 text-gray-500">
         <div className="text-lg mb-2">{t('common.no_data')}</div>

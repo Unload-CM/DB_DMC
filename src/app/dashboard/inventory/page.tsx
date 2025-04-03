@@ -2,12 +2,11 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { useTranslation } from 'react-i18next';
-import { supabase } from '@/lib/supabase';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { InventoryItem } from '@/types';
 import { createNotification } from '@/lib/notificationService';
 import { FaBox, FaArrowDown, FaArrowUp, FaClipboardList, FaSearch, FaFilter } from 'react-icons/fa';
-// toast 모듈은 임시로 제거하고 alert으로 대체
+import { useTranslation } from '../../../hooks';
 
 // 타입 확장 (임시)
 interface ExtendedInventoryItem extends InventoryItem {
@@ -16,7 +15,7 @@ interface ExtendedInventoryItem extends InventoryItem {
 }
 
 export default function InventoryPage() {
-  const { t } = useTranslation('common');
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'in' | 'out' | 'list'>('list');
   const [refreshFlag, setRefreshFlag] = useState(0);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -32,6 +31,23 @@ export default function InventoryPage() {
   const [deleteItemId, setDeleteItemId] = useState<string | null>(null);
   const [deleteItemName, setDeleteItemName] = useState<string>('');
   const [isDeleting, setIsDeleting] = useState(false);
+  const supabase = createClientComponentClient();
+  
+  // 성공 메시지 표시 핸들러 함수
+  const handleSuccess = (message: string) => {
+    setResultMessage({
+      type: 'success',
+      message: message
+    });
+    setShowResultModal(true);
+    
+    // 3초 후 모달 닫기
+    setTimeout(() => {
+      setShowResultModal(false);
+    }, 3000);
+    
+    refreshPage();
+  };
   
   // 페이지 새로고침 함수
   const refreshPage = () => {
@@ -75,7 +91,7 @@ export default function InventoryPage() {
           console.log('삭제할 항목이 이미 존재하지 않습니다:', id);
           setResultMessage({
             type: 'error',
-            message: '삭제할 항목이 이미 존재하지 않습니다. 페이지를 새로고침합니다.'
+            message: t('inventory.message.item_not_exist')
           });
           setShowResultModal(true);
           refreshPage(); // 목록 다시 불러오기
@@ -101,7 +117,7 @@ export default function InventoryPage() {
       // 삭제 성공 모달 표시
       setResultMessage({
         type: 'success',
-        message: '자재가 성공적으로 삭제되었습니다.'
+        message: t('inventory.message.delete_success')
       });
       
       // 모달 전환 (삭제 확인 모달 닫고 결과 모달 열기)
@@ -114,7 +130,7 @@ export default function InventoryPage() {
       console.error('자재 삭제 오류:', error);
       setResultMessage({
         type: 'error',
-        message: `자재 삭제 중 오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`
+        message: `${t('inventory.message.delete_error')}: ${error.message || t('common.unknown_error')}`
       });
       setShowResultModal(true);
     } finally {
@@ -157,8 +173,8 @@ export default function InventoryPage() {
         </div>
         
         <div className="p-6">
-          {activeTab === 'in' && <InventoryInTab key={`in-${refreshFlag}`} onRefresh={refreshPage} />}
-          {activeTab === 'out' && <InventoryOutTab key={`out-${refreshFlag}`} onRefresh={refreshPage} />}
+          {activeTab === 'in' && <InventoryInTab key={`in-${refreshFlag}`} onRefresh={refreshPage} handleSuccess={handleSuccess} />}
+          {activeTab === 'out' && <InventoryOutTab key={`out-${refreshFlag}`} onRefresh={refreshPage} handleSuccess={handleSuccess} />}
           {activeTab === 'list' && 
             <InventoryListTab 
               key={`list-${refreshFlag}`} 
@@ -295,7 +311,7 @@ function TabButton({
   );
 }
 
-function InventoryInTab({ onRefresh }: { onRefresh: () => void }) {
+function InventoryInTab({ onRefresh, handleSuccess }: { onRefresh: () => void; handleSuccess: (message: string) => void }) {
   const [newItem, setNewItem] = useState<Partial<InventoryItem> & {unit_price?: number}>({
     name: '',
     description: '',
@@ -308,6 +324,7 @@ function InventoryInTab({ onRefresh }: { onRefresh: () => void }) {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [itemType, setItemType] = useState<'IN' | 'OUT'>('IN');
   const [units, setUnits] = useState<{id: string, name: string, symbol: string}[]>([]);
+  const supabase = createClientComponentClient();
 
   useEffect(() => {
     fetchUnits();
@@ -700,7 +717,7 @@ ${sqlCommand}
   );
 }
 
-function InventoryOutTab({ onRefresh }: { onRefresh: () => void }) {
+function InventoryOutTab({ onRefresh, handleSuccess }: { onRefresh: () => void; handleSuccess: (message: string) => void }) {
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [selectedItemId, setSelectedItemId] = useState<string>('');
   const [selectedItemUnit, setSelectedItemUnit] = useState<string>('');
