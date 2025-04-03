@@ -12,6 +12,12 @@ interface LanguageSelectorProps {
 export default function LanguageSelector({ isCollapsed }: LanguageSelectorProps) {
   const { t, i18n } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
+  const [currentLang, setCurrentLang] = useState('ko');
+
+  // 초기 언어 설정 로드
+  useEffect(() => {
+    setCurrentLang(i18n.language.substring(0, 2));
+  }, [i18n.language]);
 
   const languages = [
     { code: 'ko', name: '한국어', flag: '🇰🇷' },
@@ -20,20 +26,33 @@ export default function LanguageSelector({ isCollapsed }: LanguageSelectorProps)
   ];
 
   const changeLanguage = (locale: string) => {
+    // 현재 언어와 같으면 변경하지 않음
+    if (locale === currentLang) {
+      setIsOpen(false);
+      return;
+    }
+
     i18n.changeLanguage(locale);
     if (typeof window !== 'undefined') {
       localStorage.setItem('language', locale);
+      // 언어 변경 후 상태 업데이트
+      setCurrentLang(locale);
     }
     setIsOpen(false);
+
+    // 언어 변경 후 페이지 새로고침 (옵션)
+    setTimeout(() => {
+      window.location.reload();
+    }, 100);
   };
 
   const getCurrentLanguageFlag = () => {
-    const lang = languages.find(lang => lang.code === i18n.language.substring(0, 2));
+    const lang = languages.find(lang => lang.code === currentLang);
     return lang ? lang.flag : '🌐';
   };
 
   const getCurrentLanguageName = () => {
-    const lang = languages.find(lang => lang.code === i18n.language.substring(0, 2));
+    const lang = languages.find(lang => lang.code === currentLang);
     return lang ? lang.name : 'Language';
   };
 
@@ -43,7 +62,8 @@ export default function LanguageSelector({ isCollapsed }: LanguageSelectorProps)
         onClick={() => setIsOpen(!isOpen)}
         className={`flex items-center w-full px-3 py-2 rounded-md text-sm transition-colors
           ${isCollapsed ? 'justify-center' : 'justify-between'}
-          hover:bg-gray-200 dark:hover:bg-gray-700`}
+          text-white bg-blue-700/30 hover:bg-blue-700/50`}
+        aria-label="언어 선택"
       >
         <div className="flex items-center">
           <span className="mr-2">{getCurrentLanguageFlag()}</span>
@@ -57,14 +77,14 @@ export default function LanguageSelector({ isCollapsed }: LanguageSelectorProps)
       </button>
 
       {isOpen && (
-        <div className={`absolute ${isCollapsed ? 'left-full ml-2' : 'inset-x-0'} bottom-full mb-1 bg-white dark:bg-gray-800 rounded-md shadow-lg z-50 py-1`}>
+        <div className={`absolute ${isCollapsed ? 'left-full ml-2' : 'inset-x-0'} bottom-full mb-1 bg-white dark:bg-gray-800 rounded-md shadow-lg z-50 py-1 border border-gray-200 dark:border-gray-700`}>
           {languages.map((lang) => (
             <button
               key={lang.code}
               onClick={() => changeLanguage(lang.code)}
-              className={`flex items-center w-full px-3 py-2 text-sm text-left
-                ${i18n.language.substring(0, 2) === lang.code ? 'bg-gray-100 dark:bg-gray-700' : ''}
-                hover:bg-gray-200 dark:hover:bg-gray-700`}
+              className={`flex items-center w-full px-3 py-2 text-sm text-left transition-colors
+                ${currentLang === lang.code ? 'bg-blue-100 dark:bg-blue-900/40 font-medium' : ''}
+                hover:bg-gray-100 dark:hover:bg-gray-700`}
             >
               <span className="mr-2">{lang.flag}</span>
               <span>{lang.name}</span>
